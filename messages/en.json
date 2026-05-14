@@ -1,0 +1,52 @@
+{
+  "nav": {
+    "home": "Home",
+    "vehicles": "Vehicles",
+    "bills": "Bills",
+    "warranty": "Warranty",
+    "property": "Property",
+    "pets": "Pets",
+    "documents": "Documents",
+    "emergency": "Emergency"
+  },
+  "home": {
+    "title": "Family Overview",
+    "upcomingReminders": "Upcoming Reminders",
+    "noReminders": "No upcoming items"
+  },
+  "vehicles": {
+    "title": "Vehicle Management",
+    "myGarage": "My Garage",
+    "addVehicle": "Add Vehicle",
+    "maintenance": "Maintenance",
+    "fuel": "Fuel Log",
+    "insurance": "Insurance",
+    "plate": "Plate",
+    "brand": "Brand",
+    "model": "Model",
+    "year": "Year",
+    "addMaintenance": "Add Maintenance",
+    "addFuel": "Add Fuel Record",
+    "mileage": "Mileage",
+    "liters": "Liters",
+    "pricePerLiter": "Price/L",
+    "totalCost": "Total Cost",
+    "fuelEfficiency": "Fuel Efficiency (km/L)"
+  },
+  "common": {
+    "add": "Add",
+    "edit": "Edit",
+    "delete": "Delete",
+    "save": "Save",
+    "cancel": "Cancel",
+    "confirm": "Confirm",
+    "note": "Note",
+    "date": "Date",
+    "amount": "Amount",
+    "dueDate": "Due Date",
+    "expiry": "Expiry",
+    "attach": "Attachment",
+    "loading": "Loading...",
+    "noData": "No data yet"
+  }
+}

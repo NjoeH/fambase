@@ -1,0 +1,52 @@
+{
+  "nav": {
+    "home": "首頁",
+    "vehicles": "車輛管理",
+    "bills": "家庭帳單",
+    "warranty": "保固記錄",
+    "property": "房屋管理",
+    "pets": "寵物管理",
+    "documents": "文件保險箱",
+    "emergency": "緊急資訊"
+  },
+  "home": {
+    "title": "家庭總覽",
+    "upcomingReminders": "即將到期提醒",
+    "noReminders": "近期沒有待辦事項"
+  },
+  "vehicles": {
+    "title": "車輛管理",
+    "myGarage": "我的車庫",
+    "addVehicle": "新增車輛",
+    "maintenance": "保養紀錄",
+    "fuel": "油耗記錄",
+    "insurance": "保險資訊",
+    "plate": "車牌",
+    "brand": "廠牌",
+    "model": "型號",
+    "year": "年份",
+    "addMaintenance": "新增保養紀錄",
+    "addFuel": "新增油耗紀錄",
+    "mileage": "里程",
+    "liters": "公升",
+    "pricePerLiter": "每公升單價",
+    "totalCost": "總費用",
+    "fuelEfficiency": "油耗（公里/公升）"
+  },
+  "common": {
+    "add": "新增",
+    "edit": "編輯",
+    "delete": "刪除",
+    "save": "儲存",
+    "cancel": "取消",
+    "confirm": "確認",
+    "note": "備註",
+    "date": "日期",
+    "amount": "金額",
+    "dueDate": "到期日",
+    "expiry": "到期日",
+    "attach": "附件",
+    "loading": "載入中...",
+    "noData": "尚無資料"
+  }
+}
