@@ -111,6 +111,8 @@ export default function LoginPage() {
         </p>
       </div>
 
+      <p className="mt-8 text-xs text-[#404945]/50">v0.1.3</p>
+
     </div>
   );
 }

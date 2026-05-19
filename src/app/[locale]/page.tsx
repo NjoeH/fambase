@@ -119,6 +119,8 @@ export default function HomePage() {
       <button className="fixed bottom-6 right-6 w-14 h-14 bg-primary text-white rounded-2xl shadow-xl flex items-center justify-center active:scale-90 transition-transform duration-150 z-50">
         <Icon name="add" className="text-3xl" />
       </button>
+
+      <p className="fixed bottom-1 left-1/2 -translate-x-1/2 text-[10px] text-on-surface-variant/30 z-40">v0.1.3</p>
     </>
   );
 }
