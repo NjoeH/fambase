@@ -4,6 +4,7 @@ import { createContext, useContext, useEffect, useState } from "react";
 import {
   onAuthStateChanged,
   signInWithPopup,
+  GoogleAuthProvider,
   signOut,
   User,
 } from "firebase/auth";
@@ -60,7 +61,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   async function signInWithGoogle() {
     const result = await signInWithPopup(auth, googleProvider);
-    const { GoogleAuthProvider } = await import("firebase/auth");
     const credential = GoogleAuthProvider.credentialFromResult(result);
     if (credential?.accessToken) {
       setGoogleAccessToken(credential.accessToken);
