@@ -46,7 +46,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           sessionStorage.setItem("google_access_token", credential.accessToken);
         }
       }
-    }).catch(console.error);
+    }).catch((err) => {
+      console.error("[AuthContext] getRedirectResult error:", err?.code, err?.message);
+    });
 
     const unsub = onAuthStateChanged(auth, async (u) => {
       clearTimeout(timeout);
