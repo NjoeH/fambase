@@ -50,7 +50,7 @@ export default function LoginPage() {
       </div>
 
       {/* Feature hints */}
-      <div className="w-full max-w-sm space-y-2 mb-8">
+      <div className="w-full max-w-[384px] space-y-2 mb-8">
         {[
           { icon: "receipt_long",         text: "帳單、保固、車輛集中管理" },
           { icon: "folder",               text: "重要文件安全存放在 Google Drive" },
@@ -64,7 +64,7 @@ export default function LoginPage() {
       </div>
 
       {/* Login button */}
-      <div className="w-full max-w-sm space-y-3">
+      <div className="w-full max-w-[384px] space-y-3">
         <button
           onClick={handleLogin}
           className="w-full flex items-center justify-center gap-3 bg-[#3a6758] text-white py-4 rounded-2xl font-semibold text-base shadow-md active:scale-95 transition-transform"

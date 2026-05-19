@@ -50,7 +50,7 @@ export default function JoinPage() {
 
   return (
     <div className="min-h-screen bg-background flex flex-col items-center justify-center px-container-padding">
-      <div className="w-full max-w-sm space-y-lg">
+      <div className="w-full max-w-[384px] space-y-lg">
 
         {/* Icon */}
         <div className="text-center">

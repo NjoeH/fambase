@@ -91,7 +91,7 @@ export default function VehiclesPage() {
                 </div>
               </div>
             </div>
-            <div className="flex-1 w-full max-w-xs flex items-center justify-center">
+            <div className="flex-1 w-full max-w-[320px] flex items-center justify-center">
               <Icon name={active.icon} className="text-primary-container text-[120px]" />
             </div>
           </div>

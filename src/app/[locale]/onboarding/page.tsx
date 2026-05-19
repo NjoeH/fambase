@@ -270,7 +270,7 @@ function OnboardingShell({
   children: React.ReactNode;
 }) {
   return (
-    <div className="min-h-screen bg-background flex flex-col px-container-padding py-xl max-w-md mx-auto">
+    <div className="min-h-screen bg-background flex flex-col px-container-padding py-xl max-w-[448px] mx-auto">
       {/* Progress */}
       <div className="flex items-center gap-md mb-xl">
         {onBack && (
