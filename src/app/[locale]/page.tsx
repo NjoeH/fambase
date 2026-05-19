@@ -1,6 +1,9 @@
 "use client";
 
-import { useTranslations } from "next-intl";
+import { useEffect } from "react";
+import { useRouter } from "next/navigation";
+import { useLocale, useTranslations } from "next-intl";
+import { useAuth } from "@/lib/AuthContext";
 import TopBar from "@/components/TopBar";
 import ReminderItem from "@/components/home/ReminderItem";
 import ModuleCard from "@/components/home/ModuleCard";
@@ -8,7 +11,24 @@ import ActivityItem from "@/components/home/ActivityItem";
 import Icon from "@/components/Icon";
 
 export default function HomePage() {
+  const { user, loading, familyId, familyLoading } = useAuth();
+  const router = useRouter();
+  const locale = useLocale();
   const t = useTranslations();
+
+  useEffect(() => {
+    if (loading || familyLoading) return;
+    if (!user) { router.replace(`/${locale}/login`); return; }
+    if (!familyId) { router.replace(`/${locale}/onboarding`); return; }
+  }, [user, loading, familyId, familyLoading, router, locale]);
+
+  if (loading || familyLoading || !user || !familyId) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
 
   const reminders = [
     { icon: "bolt",             title: "台電帳單",  subtitle: "截止日：今天",  urgency: "high"   as const, urgencyLabel: "緊急" },

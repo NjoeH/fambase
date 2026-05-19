@@ -1,31 +1,43 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useLocale } from "next-intl";
 import { useAuth } from "@/lib/AuthContext";
+import { joinFamilyByCode } from "@/lib/firestore";
 import Icon from "@/components/Icon";
 
 export default function JoinPage() {
-  const { user, loading, signInWithGoogle } = useAuth();
+  const { user, loading, signInWithGoogle, refreshFamilyId } = useAuth();
   const router = useRouter();
   const locale = useLocale();
   const searchParams = useSearchParams();
   const code = searchParams.get("code") ?? "";
 
   const [status, setStatus] = useState<"idle" | "joining" | "done" | "error">("idle");
+  const [errorMsg, setErrorMsg] = useState("");
 
-  // 已登入才能加入
   async function handleJoin() {
     if (!user) {
       await signInWithGoogle();
       return;
     }
     setStatus("joining");
-    // 之後接 Firestore 驗證邀請碼
-    await new Promise((r) => setTimeout(r, 1200));
-    setStatus("done");
-    setTimeout(() => router.replace(`/${locale}`), 1000);
+    setErrorMsg("");
+    try {
+      const result = await joinFamilyByCode(code, user.uid, user.displayName ?? "", user.email ?? "");
+      if (!result) {
+        setErrorMsg("邀請碼無效或已過期");
+        setStatus("error");
+        return;
+      }
+      await refreshFamilyId();
+      setStatus("done");
+      setTimeout(() => router.replace(`/${locale}`), 1000);
+    } catch {
+      setErrorMsg("加入失敗，請再試一次");
+      setStatus("error");
+    }
   }
 
   if (loading) {
@@ -64,33 +76,38 @@ export default function JoinPage() {
             <span className="font-semibold">加入成功！跳轉中...</span>
           </div>
         ) : (
-          <button
-            onClick={handleJoin}
-            disabled={status === "joining"}
-            className="w-full flex items-center justify-center gap-md py-md bg-primary text-on-primary rounded-2xl font-semibold text-base disabled:opacity-60 active:scale-95 transition-transform macaron-shadow"
-          >
-            {status === "joining" ? (
-              <>
-                <div className="w-5 h-5 border-2 border-on-primary border-t-transparent rounded-full animate-spin" />
-                加入中...
-              </>
-            ) : user ? (
-              <>
-                <Icon name="group_add" />
-                確認加入
-              </>
-            ) : (
-              <>
-                <svg width="18" height="18" viewBox="0 0 48 48" fill="none">
-                  <path d="M44.5 20H24v8.5h11.8C34.7 33.9 29.1 37 24 37c-7.2 0-13-5.8-13-13s5.8-13 13-13c3.1 0 5.9 1.1 8.1 2.9l6-6C34.6 5.1 29.6 3 24 3 12.4 3 3 12.4 3 24s9.4 21 21 21c10.5 0 20-7.8 20-21 0-1.4-.2-2.7-.5-4z" fill="#FFC107"/>
-                  <path d="M6.3 14.7l7 5.1C15 16.1 19.2 13 24 13c3.1 0 5.9 1.1 8.1 2.9l6-6C34.6 5.1 29.6 3 24 3c-7.7 0-14.4 4.4-17.7 11.7z" fill="#FF3D00"/>
-                  <path d="M24 45c5.5 0 10.4-1.9 14.2-5.1l-6.6-5.4C29.6 36.1 26.9 37 24 37c-5.1 0-9.4-3.1-11.2-7.5L6 35c3.3 6.8 10.1 10 18 10z" fill="#4CAF50"/>
-                  <path d="M44.5 20H24v8.5h11.8c-.8 2.5-2.4 4.6-4.5 6l6.6 5.4C41.8 36.5 45 31 45 24c0-1.4-.2-2.7-.5-4z" fill="#1976D2"/>
-                </svg>
-                用 Google 登入並加入
-              </>
+          <>
+            {errorMsg && (
+              <p className="text-sm text-error text-center">{errorMsg}</p>
             )}
-          </button>
+            <button
+              onClick={handleJoin}
+              disabled={status === "joining"}
+              className="w-full flex items-center justify-center gap-md py-md bg-primary text-on-primary rounded-2xl font-semibold text-base disabled:opacity-60 active:scale-95 transition-transform macaron-shadow"
+            >
+              {status === "joining" ? (
+                <>
+                  <div className="w-5 h-5 border-2 border-on-primary border-t-transparent rounded-full animate-spin" />
+                  加入中...
+                </>
+              ) : user ? (
+                <>
+                  <Icon name="group_add" />
+                  確認加入
+                </>
+              ) : (
+                <>
+                  <svg width="18" height="18" viewBox="0 0 48 48" fill="none">
+                    <path d="M44.5 20H24v8.5h11.8C34.7 33.9 29.1 37 24 37c-7.2 0-13-5.8-13-13s5.8-13 13-13c3.1 0 5.9 1.1 8.1 2.9l6-6C34.6 5.1 29.6 3 24 3 12.4 3 3 12.4 3 24s9.4 21 21 21c10.5 0 20-7.8 20-21 0-1.4-.2-2.7-.5-4z" fill="#FFC107"/>
+                    <path d="M6.3 14.7l7 5.1C15 16.1 19.2 13 24 13c3.1 0 5.9 1.1 8.1 2.9l6-6C34.6 5.1 29.6 3 24 3c-7.7 0-14.4 4.4-17.7 11.7z" fill="#FF3D00"/>
+                    <path d="M24 45c5.5 0 10.4-1.9 14.2-5.1l-6.6-5.4C29.6 36.1 26.9 37 24 37c-5.1 0-9.4-3.1-11.2-7.5L6 35c3.3 6.8 10.1 10 18 10z" fill="#4CAF50"/>
+                    <path d="M44.5 20H24v8.5h11.8c-.8 2.5-2.4 4.6-4.5 6l6.6 5.4C41.8 36.5 45 31 45 24c0-1.4-.2-2.7-.5-4z" fill="#1976D2"/>
+                  </svg>
+                  用 Google 登入並加入
+                </>
+              )}
+            </button>
+          </>
         )}
 
         <p className="text-xs text-center text-on-surface-variant">

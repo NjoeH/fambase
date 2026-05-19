@@ -7,27 +7,29 @@ import { useAuth } from "@/lib/AuthContext";
 import Icon from "@/components/Icon";
 
 export default function LoginPage() {
-  const { user, loading, signInWithGoogle } = useAuth();
+  const { user, loading, familyId, familyLoading, signInWithGoogle } = useAuth();
   const router = useRouter();
   const locale = useLocale();
 
   useEffect(() => {
-    if (!loading && user) {
-      // 已登入 → 先去檢查有沒有家庭（之後接 Firestore），暫時導首頁
+    if (loading || familyLoading) return;
+    if (!user) return;
+    if (familyId) {
       router.replace(`/${locale}`);
+    } else {
+      router.replace(`/${locale}/onboarding`);
     }
-  }, [user, loading, router, locale]);
+  }, [user, loading, familyId, familyLoading, router, locale]);
 
   async function handleLogin() {
     try {
       await signInWithGoogle();
-      // onAuthStateChanged 會觸發上面的 useEffect
     } catch (e) {
       console.error(e);
     }
   }
 
-  if (loading) {
+  if (loading || familyLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />

@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useLocale } from "next-intl";
 import { useAuth } from "@/lib/AuthContext";
+import { createFamily, joinFamilyByCode } from "@/lib/firestore";
 import Icon from "@/components/Icon";
 
 type Step = "choose" | "create" | "join" | "drive" | "done";
@@ -11,7 +12,7 @@ type Step = "choose" | "create" | "join" | "drive" | "done";
 const DRIVE_FOLDERS = ["帳單", "車輛", "保固", "文件", "寵物", "緊急資訊"];
 
 export default function OnboardingPage() {
-  const { user, googleAccessToken } = useAuth();
+  const { user, refreshFamilyId } = useAuth();
   const router = useRouter();
   const locale = useLocale();
 
@@ -20,8 +21,9 @@ export default function OnboardingPage() {
   const [inviteCode, setInviteCode] = useState("");
   const [driveStatus, setDriveStatus] = useState<"idle" | "creating" | "done" | "error">("idle");
   const [createdFolders, setCreatedFolders] = useState<string[]>([]);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState("");
 
-  // 模擬在 Drive 建立資料夾（之後換成真實 Drive API）
   async function createDriveFolders() {
     setDriveStatus("creating");
     setCreatedFolders([]);
@@ -32,8 +34,38 @@ export default function OnboardingPage() {
     setDriveStatus("done");
   }
 
-  function handleFinish() {
-    router.replace(`/${locale}`);
+  async function handleCreateFinish() {
+    if (!user) return;
+    setIsSubmitting(true);
+    setSubmitError("");
+    try {
+      await createFamily(familyName, user.uid, user.displayName ?? "", user.email ?? "");
+      await refreshFamilyId();
+      router.replace(`/${locale}`);
+    } catch {
+      setSubmitError("建立失敗，請再試一次");
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
+  async function handleJoinFinish() {
+    if (!user) return;
+    setIsSubmitting(true);
+    setSubmitError("");
+    try {
+      const result = await joinFamilyByCode(inviteCode, user.uid, user.displayName ?? "", user.email ?? "");
+      if (!result) {
+        setSubmitError("邀請碼無效，請確認後再試");
+        return;
+      }
+      await refreshFamilyId();
+      router.replace(`/${locale}`);
+    } catch {
+      setSubmitError("加入失敗，請再試一次");
+    } finally {
+      setIsSubmitting(false);
+    }
   }
 
   // ── Step: 選擇建立或加入 ──────────────────────
@@ -166,11 +198,15 @@ export default function OnboardingPage() {
                   <p className="text-xs text-on-surface-variant">我的雲端硬碟 / FamBase /</p>
                 </div>
               </div>
+              {submitError && (
+                <p className="text-sm text-error text-center">{submitError}</p>
+              )}
               <button
-                onClick={handleFinish}
-                className="w-full py-md bg-primary text-on-primary rounded-2xl font-semibold text-base active:scale-95 transition-transform macaron-shadow"
+                onClick={handleCreateFinish}
+                disabled={isSubmitting}
+                className="w-full py-md bg-primary text-on-primary rounded-2xl font-semibold text-base disabled:opacity-60 active:scale-95 transition-transform macaron-shadow"
               >
-                開始使用 FamBase
+                {isSubmitting ? "建立中..." : "開始使用 FamBase"}
               </button>
             </div>
           )}
@@ -204,12 +240,15 @@ export default function OnboardingPage() {
             <Icon name="link" className="text-on-surface-variant" />
             貼上邀請連結
           </button>
+          {submitError && (
+            <p className="text-sm text-error text-center">{submitError}</p>
+          )}
           <button
-            disabled={inviteCode.length < 6}
-            onClick={handleFinish}
+            disabled={inviteCode.length < 6 || isSubmitting}
+            onClick={handleJoinFinish}
             className="w-full py-md bg-primary text-on-primary rounded-2xl font-semibold text-base disabled:opacity-40 active:scale-95 transition-transform macaron-shadow"
           >
-            加入家庭
+            {isSubmitting ? "加入中..." : "加入家庭"}
           </button>
         </div>
       </OnboardingShell>
