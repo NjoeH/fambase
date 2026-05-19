@@ -23,6 +23,41 @@ export default function LoginPage() {
     }
   }, [user, loading, familyId, familyLoading, router, locale]);
 
+  function handleLogin() {
+    // 同步開好 popup（保留使用者手勢 context）
+    const w = 500, h = 600;
+    const left = Math.round(window.screenX + (window.outerWidth - w) / 2);
+    const top  = Math.round(window.screenY + (window.outerHeight - h) / 2.5);
+    const popup = window.open(
+      "about:blank", "firebaseAuthPopup",
+      `left=${left},top=${top},width=${w},height=${h}`
+    );
+    if (!popup) return; // 真的被使用者封鎖
+
+    // 攔截 Firebase 之後的 window.open 呼叫，讓它拿到已開啟的視窗
+    const origOpen = window.open.bind(window);
+    window.open = (url?: string | URL, _t?: string, _f?: string) => {
+      window.open = origOpen;
+      const href = typeof url === "string" ? url : (url as URL)?.href ?? "";
+      if (href && href !== "about:blank") {
+        try { popup.location.href = href; } catch { /* cross-origin 由 Firebase 處理 */ }
+      }
+      return popup;
+    };
+
+    signInWithPopup(auth, googleProvider)
+      .then((result) => {
+        const credential = GoogleAuthProvider.credentialFromResult(result);
+        if (credential?.accessToken)
+          sessionStorage.setItem("google_access_token", credential.accessToken);
+      })
+      .catch((err) => {
+        window.open = origOpen;
+        if (!popup.closed) popup.close();
+        console.error(err);
+      });
+  }
+
   if (loading || familyLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
@@ -60,7 +95,7 @@ export default function LoginPage() {
       {/* Login button */}
       <div className="w-full max-w-[384px] space-y-3">
         <button
-          onClick={() => signInWithPopup(auth, googleProvider).catch(console.error)}
+          onClick={handleLogin}
           className="w-full flex items-center justify-center gap-3 bg-[#3a6758] text-white py-4 rounded-2xl font-semibold text-base shadow-md active:scale-95 transition-transform"
         >
           <svg width="20" height="20" viewBox="0 0 48 48" fill="none">
