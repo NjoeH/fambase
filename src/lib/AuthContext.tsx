@@ -3,8 +3,7 @@
 import { createContext, useContext, useEffect, useState } from "react";
 import {
   onAuthStateChanged,
-  signInWithRedirect,
-  getRedirectResult,
+  signInWithPopup,
   GoogleAuthProvider,
   signOut,
   User,
@@ -38,18 +37,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setFamilyLoading(false);
     }, 5000);
 
-    getRedirectResult(auth).then((result) => {
-      if (result) {
-        const credential = GoogleAuthProvider.credentialFromResult(result);
-        if (credential?.accessToken) {
-          setGoogleAccessToken(credential.accessToken);
-          sessionStorage.setItem("google_access_token", credential.accessToken);
-        }
-      }
-    }).catch((err) => {
-      console.error("[AuthContext] getRedirectResult error:", err?.code, err?.message);
-    });
-
     const unsub = onAuthStateChanged(auth, async (u) => {
       clearTimeout(timeout);
       setUser(u);
@@ -73,7 +60,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   async function signInWithGoogle() {
-    await signInWithRedirect(auth, googleProvider);
+    const result = await signInWithPopup(auth, googleProvider);
+    const credential = GoogleAuthProvider.credentialFromResult(result);
+    if (credential?.accessToken) {
+      setGoogleAccessToken(credential.accessToken);
+      sessionStorage.setItem("google_access_token", credential.accessToken);
+    }
   }
 
   async function logout() {
