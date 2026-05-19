@@ -3,7 +3,7 @@
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useLocale } from "next-intl";
-import { signInWithPopup } from "firebase/auth";
+import { signInWithPopup, GoogleAuthProvider } from "firebase/auth";
 import { auth, googleProvider } from "@/lib/firebase";
 import { useAuth } from "@/lib/AuthContext";
 import Icon from "@/components/Icon";
