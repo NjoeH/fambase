@@ -3,6 +3,8 @@
 import { createContext, useContext, useEffect, useState } from "react";
 import {
   onAuthStateChanged,
+  setPersistence,
+  browserLocalPersistence,
   signInWithPopup,
   GoogleAuthProvider,
   signOut,
@@ -36,6 +38,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setLoading(false);
       setFamilyLoading(false);
     }, 5000);
+
+    setPersistence(auth, browserLocalPersistence).catch(console.error);
 
     const unsub = onAuthStateChanged(auth, async (u) => {
       clearTimeout(timeout);
