@@ -3,11 +3,13 @@
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useLocale } from "next-intl";
+import { signInWithPopup } from "firebase/auth";
+import { auth, googleProvider } from "@/lib/firebase";
 import { useAuth } from "@/lib/AuthContext";
 import Icon from "@/components/Icon";
 
 export default function LoginPage() {
-  const { user, loading, familyId, familyLoading, signInWithGoogle } = useAuth();
+  const { user, loading, familyId, familyLoading } = useAuth();
   const router = useRouter();
   const locale = useLocale();
 
@@ -20,14 +22,6 @@ export default function LoginPage() {
       router.replace(`/${locale}/onboarding`);
     }
   }, [user, loading, familyId, familyLoading, router, locale]);
-
-  async function handleLogin() {
-    try {
-      await signInWithGoogle();
-    } catch (e) {
-      console.error(e);
-    }
-  }
 
   if (loading || familyLoading) {
     return (
@@ -66,7 +60,7 @@ export default function LoginPage() {
       {/* Login button */}
       <div className="w-full max-w-[384px] space-y-3">
         <button
-          onClick={handleLogin}
+          onClick={() => signInWithPopup(auth, googleProvider).catch(console.error)}
           className="w-full flex items-center justify-center gap-3 bg-[#3a6758] text-white py-4 rounded-2xl font-semibold text-base shadow-md active:scale-95 transition-transform"
         >
           <svg width="20" height="20" viewBox="0 0 48 48" fill="none">
