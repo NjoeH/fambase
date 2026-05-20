@@ -3,7 +3,7 @@
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useLocale } from "next-intl";
-import { useGoogleOneTapLogin, GoogleLogin } from "@react-oauth/google";
+import { GoogleLogin } from "@react-oauth/google";
 import { useAuth } from "@/lib/AuthContext";
 import Icon from "@/components/Icon";
 
@@ -21,17 +21,6 @@ export default function LoginPage() {
       router.replace(`/${locale}/onboarding`);
     }
   }, [user, loading, familyId, familyLoading, router, locale]);
-
-  // One Tap：頁面載入後自動顯示 Google 帳號選擇器
-  useGoogleOneTapLogin({
-    onSuccess: async (res) => {
-      if (res.credential) {
-        await signInWithGoogleToken(res.credential, true);
-      }
-    },
-    onError: console.error,
-    disabled: !!user,
-  });
 
   if (loading || familyLoading) {
     return (
