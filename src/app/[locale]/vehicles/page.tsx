@@ -14,6 +14,7 @@ import VehicleCard from "@/components/vehicles/VehicleCard";
 import StatCard from "@/components/vehicles/StatCard";
 import FuelChart from "@/components/vehicles/FuelChart";
 import Modal from "@/components/Modal";
+import { uploadInvoice } from "@/lib/storage";
 
 const inputCls = "w-full rounded-xl border border-outline-variant bg-surface-container-low px-md py-sm text-sm focus:outline-none focus:ring-2 focus:ring-primary/30";
 
@@ -35,8 +36,31 @@ function InputField({ label, children }: { label: string; children: React.ReactN
   );
 }
 
-const emptyFuel: FuelRecordData = { date: "", mileage: 0, amount: 0, cost: 0, notes: "" };
-const emptyService: ServiceRecordData = { date: "", mileage: 0, type: "", cost: 0, shop: "", notes: "" };
+function InvoiceUpload({ file, onChange }: { file: File | null; onChange: (f: File | null) => void }) {
+  return (
+    <div>
+      <label className="block text-xs font-semibold text-on-surface-variant mb-xs">上傳發票 / 收據</label>
+      {file ? (
+        <div className="flex items-center gap-sm p-sm bg-primary-container/30 rounded-xl">
+          <Icon name="receipt_long" className="text-primary shrink-0" />
+          <span className="text-sm flex-1 truncate">{file.name}</span>
+          <button onClick={() => onChange(null)} className="p-xs rounded-full hover:bg-error-container transition-colors">
+            <Icon name="close" className="text-error text-base" />
+          </button>
+        </div>
+      ) : (
+        <label className="flex items-center gap-sm p-sm border-2 border-dashed border-outline-variant rounded-xl cursor-pointer hover:border-primary hover:bg-primary-container/10 transition-colors">
+          <Icon name="upload_file" className="text-on-surface-variant" />
+          <span className="text-sm text-on-surface-variant">選擇圖片或 PDF</span>
+          <input type="file" accept="image/*,.pdf" className="hidden" onChange={(e) => onChange(e.target.files?.[0] ?? null)} />
+        </label>
+      )}
+    </div>
+  );
+}
+
+const emptyFuel: FuelRecordData = { date: "", mileage: 0, amount: 0, cost: 0, notes: "", invoiceUrl: "" };
+const emptyService: ServiceRecordData = { date: "", mileage: 0, type: "", cost: 0, shop: "", notes: "", invoiceUrl: "" };
 
 const serviceTypes = ["定期保養", "輪胎更換", "煞車檢修", "引擎保養", "冷氣維修", "電池檢測", "其他"];
 
@@ -56,12 +80,14 @@ export default function VehiclesPage() {
   // Fuel modal
   const [showFuel, setShowFuel] = useState(false);
   const [fuelForm, setFuelForm] = useState<FuelRecordData>({ ...emptyFuel, date: todayStr() });
+  const [fuelInvoice, setFuelInvoice] = useState<File | null>(null);
   const [fuelSaving, setFuelSaving] = useState(false);
   const [fuelRecords, setFuelRecords] = useState<FuelRecord[]>([]);
 
   // Service modal
   const [showService, setShowService] = useState(false);
   const [serviceForm, setServiceForm] = useState<ServiceRecordData>({ ...emptyService, date: todayStr() });
+  const [serviceInvoice, setServiceInvoice] = useState<File | null>(null);
   const [serviceSaving, setServiceSaving] = useState(false);
   const [serviceRecords, setServiceRecords] = useState<ServiceRecord[]>([]);
 
@@ -90,10 +116,17 @@ export default function VehiclesPage() {
     if (!familyId || !activeId || !fuelForm.date) return;
     setFuelSaving(true);
     try {
-      const id = await addFuelRecord(familyId, activeId, fuelForm);
-      setFuelRecords((prev) => [{ id, ...fuelForm }, ...prev]);
+      let invoiceUrl = "";
+      if (fuelInvoice) {
+        const tempId = `temp-${Date.now()}`;
+        invoiceUrl = await uploadInvoice(familyId, `vehicles/${activeId}/fuel/${tempId}`, fuelInvoice);
+      }
+      const data = { ...fuelForm, invoiceUrl };
+      const id = await addFuelRecord(familyId, activeId, data);
+      setFuelRecords((prev) => [{ id, ...data }, ...prev]);
       setShowFuel(false);
       setFuelForm({ ...emptyFuel, date: todayStr() });
+      setFuelInvoice(null);
     } finally {
       setFuelSaving(false);
     }
@@ -103,10 +136,17 @@ export default function VehiclesPage() {
     if (!familyId || !activeId || !serviceForm.date || !serviceForm.type) return;
     setServiceSaving(true);
     try {
-      const id = await addServiceRecord(familyId, activeId, serviceForm);
-      setServiceRecords((prev) => [{ id, ...serviceForm }, ...prev]);
+      let invoiceUrl = "";
+      if (serviceInvoice) {
+        const tempId = `temp-${Date.now()}`;
+        invoiceUrl = await uploadInvoice(familyId, `vehicles/${activeId}/service/${tempId}`, serviceInvoice);
+      }
+      const data = { ...serviceForm, invoiceUrl };
+      const id = await addServiceRecord(familyId, activeId, data);
+      setServiceRecords((prev) => [{ id, ...data }, ...prev]);
       setShowService(false);
       setServiceForm({ ...emptyService, date: todayStr() });
+      setServiceInvoice(null);
     } finally {
       setServiceSaving(false);
     }
@@ -272,7 +312,14 @@ export default function VehiclesPage() {
                           {r.amount} {isElectric ? "kWh" : "L"} · {r.mileage.toLocaleString()} km
                         </p>
                       </div>
-                      {r.cost > 0 && <span className="text-sm font-bold text-primary">NT$ {r.cost.toLocaleString()}</span>}
+                      <div className="flex items-center gap-sm">
+                        {r.cost > 0 && <span className="text-sm font-bold text-primary">{r.cost.toLocaleString()}</span>}
+                        {r.invoiceUrl && (
+                          <a href={r.invoiceUrl} target="_blank" rel="noopener noreferrer" className="p-xs rounded-full hover:bg-primary-container transition-colors" title="查看發票">
+                            <Icon name="receipt_long" className="text-primary text-base" />
+                          </a>
+                        )}
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -295,7 +342,14 @@ export default function VehiclesPage() {
                           {r.date.replace(/-/g, "/")} · {r.mileage.toLocaleString()} km {r.shop ? `· ${r.shop}` : ""}
                         </p>
                       </div>
-                      {r.cost > 0 && <span className="text-sm font-bold text-secondary">NT$ {r.cost.toLocaleString()}</span>}
+                      <div className="flex items-center gap-sm">
+                        {r.cost > 0 && <span className="text-sm font-bold text-secondary">{r.cost.toLocaleString()}</span>}
+                        {r.invoiceUrl && (
+                          <a href={r.invoiceUrl} target="_blank" rel="noopener noreferrer" className="p-xs rounded-full hover:bg-secondary-container transition-colors" title="查看發票">
+                            <Icon name="receipt_long" className="text-secondary text-base" />
+                          </a>
+                        )}
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -357,15 +411,16 @@ export default function VehiclesPage() {
               <input type="number" step="0.1" value={fuelForm.amount || ""} onChange={(e) => setFuelForm((f) => ({ ...f, amount: Number(e.target.value) }))} placeholder="0" className={inputCls} />
             </InputField>
           </div>
-          <InputField label="費用 (NT$)">
+          <InputField label="費用">
             <input type="number" value={fuelForm.cost || ""} onChange={(e) => setFuelForm((f) => ({ ...f, cost: Number(e.target.value) }))} placeholder="0" className={inputCls} />
           </InputField>
           <InputField label="備註">
             <input value={fuelForm.notes} onChange={(e) => setFuelForm((f) => ({ ...f, notes: e.target.value }))} placeholder="選填" className={inputCls} />
           </InputField>
+          <InvoiceUpload file={fuelInvoice} onChange={setFuelInvoice} />
           <button onClick={handleAddFuel} disabled={!fuelForm.date || fuelSaving}
             className="w-full py-md bg-primary text-on-primary rounded-2xl font-semibold text-base disabled:opacity-50 hover:opacity-90 active:scale-95 transition-all">
-            {fuelSaving ? "儲存中..." : "儲存記錄"}
+            {fuelSaving ? "上傳中..." : "儲存記錄"}
           </button>
         </div>
       </Modal>
@@ -391,7 +446,7 @@ export default function VehiclesPage() {
             <InputField label="里程 (km)">
               <input type="number" value={serviceForm.mileage || ""} onChange={(e) => setServiceForm((f) => ({ ...f, mileage: Number(e.target.value) }))} placeholder="0" className={inputCls} />
             </InputField>
-            <InputField label="費用 (NT$)">
+            <InputField label="費用">
               <input type="number" value={serviceForm.cost || ""} onChange={(e) => setServiceForm((f) => ({ ...f, cost: Number(e.target.value) }))} placeholder="0" className={inputCls} />
             </InputField>
           </div>
@@ -401,9 +456,10 @@ export default function VehiclesPage() {
           <InputField label="備註">
             <input value={serviceForm.notes} onChange={(e) => setServiceForm((f) => ({ ...f, notes: e.target.value }))} placeholder="選填" className={inputCls} />
           </InputField>
+          <InvoiceUpload file={serviceInvoice} onChange={setServiceInvoice} />
           <button onClick={handleAddService} disabled={!serviceForm.date || !serviceForm.type || serviceSaving}
             className="w-full py-md bg-primary text-on-primary rounded-2xl font-semibold text-base disabled:opacity-50 hover:opacity-90 active:scale-95 transition-all">
-            {serviceSaving ? "儲存中..." : "儲存記錄"}
+            {serviceSaving ? "上傳中..." : "儲存記錄"}
           </button>
         </div>
       </Modal>

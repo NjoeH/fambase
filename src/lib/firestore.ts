@@ -203,6 +203,7 @@ export interface FuelRecordData {
   amount: number;   // litres (gas) or kWh (electric)
   cost: number;
   notes: string;
+  invoiceUrl?: string;
 }
 
 export interface FuelRecord extends FuelRecordData {
@@ -238,6 +239,7 @@ export interface ServiceRecordData {
   cost: number;
   shop: string;
   notes: string;
+  invoiceUrl?: string;
 }
 
 export interface ServiceRecord extends ServiceRecordData {
