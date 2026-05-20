@@ -46,7 +46,7 @@ export default function LoginPage() {
       <div className="w-full max-w-[384px] space-y-2 mb-8">
         {[
           { icon: "receipt_long",         text: "帳單、保固、車輛集中管理" },
-          { icon: "folder",               text: "重要文件安全存放在 Google Drive" },
+          { icon: "cloud_upload",          text: "照片、發票安全存放於雲端" },
           { icon: "notifications_active", text: "到期前自動提醒，不漏接" },
         ].map((f) => (
           <div key={f.text} className="flex items-center gap-4 bg-[#f3f4f1] rounded-xl px-4 py-3">
@@ -71,7 +71,7 @@ export default function LoginPage() {
           size="large"
         />
         <p className="text-xs text-center text-[#404945] px-4">
-          登入即表示同意我們的服務條款。您的資料存放在個人 Google Drive，我們不會儲存任何私人檔案。
+          登入即表示同意我們的服務條款。
         </p>
       </div>
 

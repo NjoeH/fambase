@@ -240,6 +240,8 @@ export interface ServiceRecordData {
   shop: string;
   notes: string;
   invoiceUrl?: string;
+  nextServiceDate?: string;
+  nextServiceMileage?: number;
 }
 
 export interface ServiceRecord extends ServiceRecordData {
@@ -264,4 +266,34 @@ export async function addServiceRecord(
     { ...data, createdAt: serverTimestamp() },
   );
   return ref.id;
+}
+
+// ── Service Intervals (保養提醒設定) ────────────────────────────────────────
+
+export interface ServiceIntervalData {
+  type: string;
+  intervalDays?: number;
+  intervalMileage?: number;
+}
+
+export interface ServiceInterval extends ServiceIntervalData {
+  id: string;
+}
+
+export async function getServiceIntervals(familyId: string): Promise<ServiceInterval[]> {
+  const snap = await getDocs(
+    query(collection(db, "families", familyId, "serviceIntervals"), orderBy("createdAt", "asc"))
+  );
+  return snap.docs.map((d) => ({ id: d.id, ...d.data() } as ServiceInterval));
+}
+
+export async function addServiceInterval(familyId: string, data: ServiceIntervalData): Promise<string> {
+  const ref = await addDoc(collection(db, "families", familyId, "serviceIntervals"), {
+    ...data, createdAt: serverTimestamp(),
+  });
+  return ref.id;
+}
+
+export async function deleteServiceInterval(familyId: string, intervalId: string): Promise<void> {
+  await deleteDoc(doc(db, "families", familyId, "serviceIntervals", intervalId));
 }

@@ -8,6 +8,7 @@ import {
   getVehicles, Vehicle,
   getFuelRecords, addFuelRecord, FuelRecord, FuelRecordData,
   getServiceRecords, addServiceRecord, ServiceRecord, ServiceRecordData,
+  getServiceIntervals, ServiceInterval,
 } from "@/lib/firestore";
 import Icon from "@/components/Icon";
 import VehicleCard from "@/components/vehicles/VehicleCard";
@@ -59,10 +60,41 @@ function InvoiceUpload({ file, onChange }: { file: File | null; onChange: (f: Fi
   );
 }
 
-const emptyFuel: FuelRecordData = { date: "", mileage: 0, amount: 0, cost: 0, notes: "", invoiceUrl: "" };
-const emptyService: ServiceRecordData = { date: "", mileage: 0, type: "", cost: 0, shop: "", notes: "", invoiceUrl: "" };
+function addDays(dateStr: string, days: number): string {
+  const d = new Date(dateStr);
+  d.setDate(d.getDate() + days);
+  return d.toISOString().split("T")[0];
+}
 
-const serviceTypes = ["定期保養", "輪胎更換", "煞車檢修", "引擎保養", "冷氣維修", "電池檢測", "其他"];
+function MileageInput({ baseMileage, value, onChange }: { baseMileage: number; value: number; onChange: (v: number) => void }) {
+  const prefix = value > 0 ? Math.floor(value / 1000) : Math.floor(baseMileage / 1000);
+  const suffix = value > 0 ? value % 1000 : 0;
+  const halfCls = "rounded-xl border border-outline-variant bg-surface-container-low px-md py-sm text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 w-full";
+  return (
+    <div className="flex items-center gap-xs">
+      <input type="number" value={prefix} onChange={(e) => onChange((parseInt(e.target.value) || 0) * 1000 + suffix)}
+        className={halfCls + " text-right"} />
+      <span className="text-on-surface-variant font-bold shrink-0">,</span>
+      <input type="number" value={suffix || ""} min={0} max={999} placeholder="000"
+        onChange={(e) => onChange(prefix * 1000 + Math.min(999, Math.max(0, parseInt(e.target.value) || 0)))}
+        className={halfCls} />
+      <span className="text-sm text-on-surface-variant shrink-0">km</span>
+    </div>
+  );
+}
+
+const emptyFuel: FuelRecordData = { date: "", mileage: 0, amount: 0, cost: 0, notes: "", invoiceUrl: "" };
+const emptyService: ServiceRecordData = { date: "", mileage: 0, type: "", cost: 0, shop: "", notes: "", invoiceUrl: "", nextServiceDate: "", nextServiceMileage: undefined };
+
+function calcAvgEfficiency(records: FuelRecord[]): number | null {
+  const sorted = [...records].sort((a, b) => a.mileage - b.mileage);
+  const vals = sorted.slice(1).map((r, i) => {
+    const dist = r.mileage - sorted[i].mileage;
+    return dist > 0 && r.amount > 0 ? (r.amount / dist) * 100 : null;
+  }).filter((x): x is number => x !== null);
+  return vals.length ? parseFloat((vals.reduce((s, v) => s + v, 0) / vals.length).toFixed(1)) : null;
+}
+
 
 export default function VehiclesPage() {
   const t = useTranslations();
@@ -90,6 +122,7 @@ export default function VehiclesPage() {
   const [serviceInvoice, setServiceInvoice] = useState<File | null>(null);
   const [serviceSaving, setServiceSaving] = useState(false);
   const [serviceRecords, setServiceRecords] = useState<ServiceRecord[]>([]);
+  const [serviceIntervals, setServiceIntervals] = useState<ServiceInterval[]>([]);
 
   useEffect(() => {
     if (!familyId) return;
@@ -99,6 +132,7 @@ export default function VehiclesPage() {
         if (v.length > 0) setActiveId(v[0].id);
       })
       .finally(() => setLoading(false));
+    getServiceIntervals(familyId).then(setServiceIntervals);
   }, [familyId]);
 
   // Load records when active vehicle changes
@@ -110,7 +144,34 @@ export default function VehiclesPage() {
 
   const active = vehicles.find((v) => v.id === activeId) ?? null;
   const isElectric = active?.type === "electric";
+
+  // 合併預設 + 歷史紀錄類型（去重）
+  const defaultTypes = ["定期保養", "輪胎更換", "煞車檢修", "引擎保養", "冷氣維修", "電池檢測", "其他"];
+  const allServiceTypes = Array.from(new Set([...defaultTypes, ...serviceRecords.map((r) => r.type)]));
+
+  function applyServiceInterval(type: string) {
+    const interval = serviceIntervals.find((iv) => iv.type === type);
+    if (!interval) return;
+    const lastRecord = serviceRecords.find((r) => r.type === type);
+    const baseDate = lastRecord?.date ?? todayStr();
+    const baseMileage = lastRecord?.mileage ?? (active?.mileage ?? 0);
+    setServiceForm((f) => ({
+      ...f,
+      nextServiceDate: interval.intervalDays ? addDays(baseDate, interval.intervalDays) : f.nextServiceDate,
+      nextServiceMileage: interval.intervalMileage ? baseMileage + interval.intervalMileage : f.nextServiceMileage,
+    }));
+  }
   const insuranceDays = active ? daysUntil(active.insuranceExpiry) : Infinity;
+  const avgEfficiency = calcAvgEfficiency(fuelRecords);
+
+  // 找最近一筆有設定下次保養的紀錄
+  const nextServiceReminder = serviceRecords.find(
+    (r) => r.nextServiceDate || (r.nextServiceMileage && r.nextServiceMileage > 0)
+  ) ?? null;
+  const nextServiceDays = nextServiceReminder?.nextServiceDate ? daysUntil(nextServiceReminder.nextServiceDate) : null;
+  const nextServiceKmLeft = nextServiceReminder?.nextServiceMileage && active
+    ? nextServiceReminder.nextServiceMileage - active.mileage
+    : null;
 
   async function handleAddFuel() {
     if (!familyId || !activeId || !fuelForm.date) return;
@@ -257,33 +318,67 @@ export default function VehiclesPage() {
                     </p>
                   </div>
                 </div>
-                <div className="bg-secondary-container text-on-secondary-container p-lg rounded-xl shadow-sm flex flex-col justify-between min-h-[160px]">
-                  <div>
-                    <div className="flex justify-between items-start">
-                      <Icon name="build" className="text-secondary" />
-                      <span className="text-xs font-bold uppercase">保修</span>
+                {(() => {
+                  const warn = nextServiceDays !== null && nextServiceDays <= 30;
+                  const overdue = nextServiceDays !== null && nextServiceDays <= 0;
+                  const kmWarn = nextServiceKmLeft !== null && nextServiceKmLeft <= 1000;
+                  const isAlert = overdue || warn || kmWarn;
+                  return (
+                    <div className={`${isAlert ? "bg-tertiary-container text-on-tertiary-container" : "bg-secondary-container text-on-secondary-container"} p-lg rounded-xl shadow-sm flex flex-col justify-between min-h-[160px]`}>
+                      <div>
+                        <div className="flex justify-between items-start">
+                          <Icon name={isAlert ? "warning" : "build"} className={isAlert ? "text-tertiary" : "text-secondary"} />
+                          <span className="text-xs font-bold uppercase">保修</span>
+                        </div>
+                        {nextServiceReminder ? (
+                          <>
+                            <h3 className="text-lg font-semibold mt-sm">
+                              {overdue ? "保養已逾期" : "下次保養"}
+                            </h3>
+                            {nextServiceDays !== null && (
+                              <p className="text-xs opacity-90 mt-xs">
+                                {nextServiceReminder.nextServiceDate?.replace(/-/g, "/")}
+                                {nextServiceDays > 0 ? ` · 剩 ${nextServiceDays} 天` : " · 已逾期"}
+                              </p>
+                            )}
+                            {nextServiceKmLeft !== null && (
+                              <p className="text-xs opacity-90 mt-xs">
+                                {nextServiceKmLeft > 0 ? `還差 ${nextServiceKmLeft.toLocaleString()} km` : `里程已超過 ${Math.abs(nextServiceKmLeft).toLocaleString()} km`}
+                              </p>
+                            )}
+                          </>
+                        ) : (
+                          <>
+                            <h3 className="text-lg font-semibold mt-sm">
+                              {serviceRecords.length > 0 ? `共 ${serviceRecords.length} 筆紀錄` : "尚無保修紀錄"}
+                            </h3>
+                            {serviceRecords[0] && (
+                              <p className="text-xs opacity-80 mt-xs">最近：{serviceRecords[0].type} · {serviceRecords[0].date.replace(/-/g, "/")}</p>
+                            )}
+                          </>
+                        )}
+                      </div>
                     </div>
-                    <h3 className="text-lg font-semibold mt-sm">
-                      {serviceRecords.length > 0 ? `共 ${serviceRecords.length} 筆紀錄` : "尚無保修紀錄"}
-                    </h3>
-                    {serviceRecords[0] && (
-                      <p className="text-xs opacity-80 mt-xs">最近：{serviceRecords[0].type} · {serviceRecords[0].date.replace(/-/g, "/")}</p>
-                    )}
-                  </div>
-                </div>
+                  );
+                })()}
               </div>
             </section>
 
             {/* 圖表 + 統計 */}
             <section className="grid grid-cols-1 md:grid-cols-2 gap-lg mb-lg">
-              <FuelChart title={isElectric ? "電耗趨勢" : "油耗趨勢"} />
+              <FuelChart records={fuelRecords} isElectric={isElectric} />
               <div className="grid grid-cols-2 gap-md">
                 <StatCard
                   icon={isElectric ? "ev_station" : "local_gas_station"}
-                  label="加油/充電次數"
+                  label={isElectric ? "充電次數" : "加油次數"}
                   value={String(fuelRecords.length)}
                 />
-                <StatCard icon="tire_repair" label="胎壓狀態" value="正常" />
+                <StatCard
+                  icon="speed"
+                  label={isElectric ? "平均電耗" : "平均油耗"}
+                  value={avgEfficiency !== null ? String(avgEfficiency) : "—"}
+                  unit={avgEfficiency !== null ? (isElectric ? "kWh/100km" : "L/100km") : undefined}
+                />
                 <StatCard
                   icon="build"
                   label="保修紀錄"
@@ -404,8 +499,8 @@ export default function VehiclesPage() {
             <input type="date" value={fuelForm.date} onChange={(e) => setFuelForm((f) => ({ ...f, date: e.target.value }))} className={inputCls} />
           </InputField>
           <div className="grid grid-cols-2 gap-md">
-            <InputField label="里程 (km)">
-              <input type="number" value={fuelForm.mileage || ""} onChange={(e) => setFuelForm((f) => ({ ...f, mileage: Number(e.target.value) }))} placeholder="0" className={inputCls} />
+            <InputField label="里程">
+              <MileageInput baseMileage={active?.mileage ?? 0} value={fuelForm.mileage} onChange={(v) => setFuelForm((f) => ({ ...f, mileage: v }))} />
             </InputField>
             <InputField label={isElectric ? "充電量 (kWh)" : "加油量 (L)"}>
               <input type="number" step="0.1" value={fuelForm.amount || ""} onChange={(e) => setFuelForm((f) => ({ ...f, amount: Number(e.target.value) }))} placeholder="0" className={inputCls} />
@@ -433,18 +528,18 @@ export default function VehiclesPage() {
           </InputField>
           <InputField label="保修項目 *">
             <div className="flex flex-wrap gap-sm mb-sm">
-              {serviceTypes.map((tp) => (
-                <button key={tp} onClick={() => setServiceForm((f) => ({ ...f, type: tp }))}
+              {allServiceTypes.map((tp) => (
+                <button key={tp} onClick={() => { setServiceForm((f) => ({ ...f, type: tp })); applyServiceInterval(tp); }}
                   className={`px-sm py-xs rounded-full text-xs font-semibold transition-colors ${serviceForm.type === tp ? "bg-primary text-on-primary" : "bg-surface-container-high text-on-surface-variant"}`}>
-                  {tp}
+                  {tp}{serviceIntervals.find((iv) => iv.type === tp) ? " ★" : ""}
                 </button>
               ))}
             </div>
             <input value={serviceForm.type} onChange={(e) => setServiceForm((f) => ({ ...f, type: e.target.value }))} placeholder="或直接輸入..." className={inputCls} />
           </InputField>
           <div className="grid grid-cols-2 gap-md">
-            <InputField label="里程 (km)">
-              <input type="number" value={serviceForm.mileage || ""} onChange={(e) => setServiceForm((f) => ({ ...f, mileage: Number(e.target.value) }))} placeholder="0" className={inputCls} />
+            <InputField label="里程">
+              <MileageInput baseMileage={active?.mileage ?? 0} value={serviceForm.mileage} onChange={(v) => setServiceForm((f) => ({ ...f, mileage: v }))} />
             </InputField>
             <InputField label="費用">
               <input type="number" value={serviceForm.cost || ""} onChange={(e) => setServiceForm((f) => ({ ...f, cost: Number(e.target.value) }))} placeholder="0" className={inputCls} />
@@ -456,6 +551,17 @@ export default function VehiclesPage() {
           <InputField label="備註">
             <input value={serviceForm.notes} onChange={(e) => setServiceForm((f) => ({ ...f, notes: e.target.value }))} placeholder="選填" className={inputCls} />
           </InputField>
+          <div className="border-t border-outline-variant pt-md">
+            <p className="text-xs font-semibold text-on-surface-variant mb-sm uppercase tracking-wider">下次保養提醒（選填）</p>
+            <div className="grid grid-cols-2 gap-md">
+              <InputField label="日期">
+                <input type="date" value={serviceForm.nextServiceDate ?? ""} onChange={(e) => setServiceForm((f) => ({ ...f, nextServiceDate: e.target.value }))} className={inputCls} />
+              </InputField>
+              <InputField label="里程 (km)">
+                <input type="number" value={serviceForm.nextServiceMileage || ""} onChange={(e) => setServiceForm((f) => ({ ...f, nextServiceMileage: Number(e.target.value) || undefined }))} placeholder="0" className={inputCls} />
+              </InputField>
+            </div>
+          </div>
           <InvoiceUpload file={serviceInvoice} onChange={setServiceInvoice} />
           <button onClick={handleAddService} disabled={!serviceForm.date || !serviceForm.type || serviceSaving}
             className="w-full py-md bg-primary text-on-primary rounded-2xl font-semibold text-base disabled:opacity-50 hover:opacity-90 active:scale-95 transition-all">

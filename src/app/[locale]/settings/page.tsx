@@ -7,6 +7,8 @@ import { useAuth } from "@/lib/AuthContext";
 import {
   getVehicles, addVehicle, deleteVehicle,
   Vehicle, VehicleData,
+  getServiceIntervals, addServiceInterval, deleteServiceInterval,
+  ServiceInterval, ServiceIntervalData,
 } from "@/lib/firestore";
 import Icon from "@/components/Icon";
 import Modal from "@/components/Modal";
@@ -16,6 +18,10 @@ const inputCls = "w-full rounded-xl border border-outline-variant bg-surface-con
 const emptyVehicleForm: VehicleData = {
   name: "", plate: "", type: "gas", fuelPct: 100, mileage: 0, insuranceExpiry: "",
 };
+
+const defaultIntervalTypes = ["定期保養", "輪胎更換", "煞車檢修", "引擎保養", "冷氣維修", "電池檢測"];
+
+const emptyIntervalForm: ServiceIntervalData = { type: "", intervalDays: undefined, intervalMileage: undefined };
 
 function InputField({ label, children }: { label: string; children: React.ReactNode }) {
   return (
@@ -39,11 +45,18 @@ export default function SettingsPage() {
   const [vehicleForm, setVehicleForm] = useState<VehicleData>(emptyVehicleForm);
   const [vehicleSaving, setVehicleSaving] = useState(false);
 
+  // Service intervals
+  const [intervals, setIntervals] = useState<ServiceInterval[]>([]);
+  const [showAddInterval, setShowAddInterval] = useState(false);
+  const [intervalForm, setIntervalForm] = useState<ServiceIntervalData>(emptyIntervalForm);
+  const [intervalSaving, setIntervalSaving] = useState(false);
+
   useEffect(() => {
     if (!familyId) return;
     getVehicles(familyId)
       .then(setVehicles)
       .finally(() => setVehicleLoading(false));
+    getServiceIntervals(familyId).then(setIntervals);
   }, [familyId]);
 
   async function handleAddVehicle() {
@@ -63,6 +76,25 @@ export default function SettingsPage() {
     if (!familyId) return;
     await deleteVehicle(familyId, vehicleId);
     setVehicles((prev) => prev.filter((v) => v.id !== vehicleId));
+  }
+
+  async function handleAddInterval() {
+    if (!familyId || !intervalForm.type) return;
+    setIntervalSaving(true);
+    try {
+      const id = await addServiceInterval(familyId, intervalForm);
+      setIntervals((prev) => [...prev, { id, ...intervalForm }]);
+      setShowAddInterval(false);
+      setIntervalForm(emptyIntervalForm);
+    } finally {
+      setIntervalSaving(false);
+    }
+  }
+
+  async function handleDeleteInterval(intervalId: string) {
+    if (!familyId) return;
+    await deleteServiceInterval(familyId, intervalId);
+    setIntervals((prev) => prev.filter((i) => i.id !== intervalId));
   }
 
   async function handleLogout() {
@@ -123,6 +155,72 @@ export default function SettingsPage() {
               </div>
               <span className="text-sm font-semibold">新增車輛</span>
             </button>
+          </div>
+        </section>
+
+        {/* 保養提醒設定 */}
+        <section>
+          <h2 className="text-xs font-semibold tracking-wider uppercase text-on-surface-variant mb-md px-1">
+            保養提醒設定
+          </h2>
+          <div className="bg-white rounded-xl shadow-sm macaron-shadow overflow-hidden">
+            {intervals.length === 0 && !showAddInterval && (
+              <div className="p-md text-center text-sm text-on-surface-variant">尚未設定保養間隔</div>
+            )}
+            {intervals.map((iv, i, arr) => (
+              <div key={iv.id} className={`flex items-center gap-md p-md ${i < arr.length - 1 || showAddInterval ? "border-b border-surface-variant/30" : ""}`}>
+                <div className="w-10 h-10 rounded-xl bg-secondary-container/50 flex items-center justify-center shrink-0">
+                  <Icon name="build" className="text-secondary" />
+                </div>
+                <div className="flex-1">
+                  <p className="text-sm font-semibold text-on-surface">{iv.type}</p>
+                  <p className="text-xs text-on-surface-variant">
+                    {[iv.intervalDays ? `每 ${iv.intervalDays} 天` : "", iv.intervalMileage ? `每 ${iv.intervalMileage.toLocaleString()} km` : ""].filter(Boolean).join(" · ") || "未設定間隔"}
+                  </p>
+                </div>
+                <button onClick={() => handleDeleteInterval(iv.id)} className="p-xs rounded-full hover:bg-error-container transition-colors">
+                  <Icon name="delete" className="text-error text-base" />
+                </button>
+              </div>
+            ))}
+
+            {showAddInterval ? (
+              <div className="p-md space-y-md border-t border-surface-variant/30">
+                <p className="text-xs font-semibold text-on-surface-variant uppercase tracking-wider">選擇或輸入保修類型</p>
+                <div className="flex flex-wrap gap-sm">
+                  {defaultIntervalTypes.filter((t) => !intervals.find((iv) => iv.type === t)).map((t) => (
+                    <button key={t} onClick={() => setIntervalForm((f) => ({ ...f, type: t }))}
+                      className={`px-sm py-xs rounded-full text-xs font-semibold transition-colors ${intervalForm.type === t ? "bg-primary text-on-primary" : "bg-surface-container-high text-on-surface-variant"}`}>
+                      {t}
+                    </button>
+                  ))}
+                </div>
+                <input value={intervalForm.type} onChange={(e) => setIntervalForm((f) => ({ ...f, type: e.target.value }))} placeholder="或自訂類型..." className={inputCls} />
+                <div className="grid grid-cols-2 gap-md">
+                  <InputField label="間隔天數">
+                    <input type="number" value={intervalForm.intervalDays || ""} onChange={(e) => setIntervalForm((f) => ({ ...f, intervalDays: Number(e.target.value) || undefined }))} placeholder="例：180" className={inputCls} />
+                  </InputField>
+                  <InputField label="間隔里程 (km)">
+                    <input type="number" value={intervalForm.intervalMileage || ""} onChange={(e) => setIntervalForm((f) => ({ ...f, intervalMileage: Number(e.target.value) || undefined }))} placeholder="例：5000" className={inputCls} />
+                  </InputField>
+                </div>
+                <div className="flex gap-sm">
+                  <button onClick={() => { setShowAddInterval(false); setIntervalForm(emptyIntervalForm); }} className="flex-1 py-sm border border-outline-variant rounded-xl text-sm text-on-surface-variant">取消</button>
+                  <button onClick={handleAddInterval} disabled={!intervalForm.type || intervalSaving}
+                    className="flex-1 py-sm bg-primary text-on-primary rounded-xl text-sm font-semibold disabled:opacity-50">
+                    {intervalSaving ? "儲存中..." : "儲存"}
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <button onClick={() => setShowAddInterval(true)}
+                className="w-full flex items-center gap-md p-md hover:bg-surface-container-low transition-colors border-t border-surface-variant/30 text-primary">
+                <div className="w-10 h-10 rounded-xl bg-primary-container/30 flex items-center justify-center">
+                  <Icon name="add" className="text-primary" />
+                </div>
+                <span className="text-sm font-semibold">新增保養間隔</span>
+              </button>
+            )}
           </div>
         </section>
 
