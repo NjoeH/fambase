@@ -3,13 +3,11 @@
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useLocale } from "next-intl";
-import { signInWithPopup, GoogleAuthProvider } from "firebase/auth";
-import { auth, googleProvider } from "@/lib/firebase";
 import { useAuth } from "@/lib/AuthContext";
 import Icon from "@/components/Icon";
 
 export default function LoginPage() {
-  const { user, loading, familyId, familyLoading } = useAuth();
+  const { user, loading, familyId, familyLoading, signInWithGoogle } = useAuth();
   const router = useRouter();
   const locale = useLocale();
 
@@ -23,39 +21,12 @@ export default function LoginPage() {
     }
   }, [user, loading, familyId, familyLoading, router, locale]);
 
-  function handleLogin() {
-    // 同步開好 popup（保留使用者手勢 context）
-    const w = 500, h = 600;
-    const left = Math.round(window.screenX + (window.outerWidth - w) / 2);
-    const top  = Math.round(window.screenY + (window.outerHeight - h) / 2.5);
-    const popup = window.open(
-      "about:blank", "firebaseAuthPopup",
-      `left=${left},top=${top},width=${w},height=${h}`
-    );
-    if (!popup) return; // 真的被使用者封鎖
-
-    // 攔截 Firebase 之後的 window.open 呼叫，讓它拿到已開啟的視窗
-    const origOpen = window.open.bind(window);
-    window.open = (url?: string | URL, _t?: string, _f?: string) => {
-      window.open = origOpen;
-      const href = typeof url === "string" ? url : (url as URL)?.href ?? "";
-      if (href && href !== "about:blank") {
-        try { popup.location.href = href; } catch { /* cross-origin 由 Firebase 處理 */ }
-      }
-      return popup;
-    };
-
-    signInWithPopup(auth, googleProvider)
-      .then((result) => {
-        const credential = GoogleAuthProvider.credentialFromResult(result);
-        if (credential?.accessToken)
-          sessionStorage.setItem("google_access_token", credential.accessToken);
-      })
-      .catch((err) => {
-        window.open = origOpen;
-        if (!popup.closed) popup.close();
-        console.error(err);
-      });
+  async function handleLogin() {
+    try {
+      await signInWithGoogle();
+    } catch (e) {
+      console.error(e);
+    }
   }
 
   if (loading || familyLoading) {

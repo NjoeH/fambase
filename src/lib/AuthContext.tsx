@@ -3,9 +3,8 @@
 import { createContext, useContext, useEffect, useState } from "react";
 import {
   onAuthStateChanged,
-  setPersistence,
-  browserLocalPersistence,
-  signInWithPopup,
+  getRedirectResult,
+  signInWithRedirect,
   GoogleAuthProvider,
   signOut,
   User,
@@ -37,39 +36,56 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const timeout = setTimeout(() => {
       setLoading(false);
       setFamilyLoading(false);
-    }, 5000);
+    }, 8000);
 
-    setPersistence(auth, browserLocalPersistence).catch(console.error);
+    async function init() {
+      // 先等 redirect 結果處理完，再訂閱 auth 狀態
+      // 這樣 onAuthStateChanged 第一次觸發時 user 已經是正確值
+      try {
+        const result = await getRedirectResult(auth);
+        if (result) {
+          const credential = GoogleAuthProvider.credentialFromResult(result);
+          if (credential?.accessToken) {
+            setGoogleAccessToken(credential.accessToken);
+            sessionStorage.setItem("google_access_token", credential.accessToken);
+          }
+        }
+      } catch (err: unknown) {
+        const e = err as { code?: string; message?: string };
+        console.error("[Auth] getRedirectResult error:", e?.code, e?.message);
+      }
 
-    const unsub = onAuthStateChanged(auth, async (u) => {
-      clearTimeout(timeout);
-      setUser(u);
-      setLoading(false);
+      const unsub = onAuthStateChanged(auth, async (u) => {
+        clearTimeout(timeout);
+        console.log("[Auth] onAuthStateChanged:", u?.email ?? null);
+        setUser(u);
+        setLoading(false);
 
-      if (u) {
-        setFamilyLoading(true);
-        try {
-          const id = await getUserFamilyId(u.uid);
-          setFamilyId(id);
-        } finally {
+        if (u) {
+          setFamilyLoading(true);
+          try {
+            const id = await getUserFamilyId(u.uid);
+            setFamilyId(id);
+          } finally {
+            setFamilyLoading(false);
+          }
+        } else {
+          setFamilyId(null);
           setFamilyLoading(false);
         }
-      } else {
-        setFamilyId(null);
-        setFamilyLoading(false);
-      }
-    });
+      });
 
-    return () => { unsub(); clearTimeout(timeout); };
+      return unsub;
+    }
+
+    let unsub: (() => void) | undefined;
+    init().then((fn) => { unsub = fn; });
+
+    return () => { unsub?.(); clearTimeout(timeout); };
   }, []);
 
   async function signInWithGoogle() {
-    const result = await signInWithPopup(auth, googleProvider);
-    const credential = GoogleAuthProvider.credentialFromResult(result);
-    if (credential?.accessToken) {
-      setGoogleAccessToken(credential.accessToken);
-      sessionStorage.setItem("google_access_token", credential.accessToken);
-    }
+    await signInWithRedirect(auth, googleProvider);
   }
 
   async function logout() {
