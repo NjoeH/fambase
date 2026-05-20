@@ -3,7 +3,7 @@
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useLocale } from "next-intl";
-import { useGoogleLogin } from "@react-oauth/google";
+import { useGoogleOneTapLogin, GoogleLogin } from "@react-oauth/google";
 import { useAuth } from "@/lib/AuthContext";
 import Icon from "@/components/Icon";
 
@@ -22,15 +22,15 @@ export default function LoginPage() {
     }
   }, [user, loading, familyId, familyLoading, router, locale]);
 
-  const login = useGoogleLogin({
-    onSuccess: async ({ access_token }) => {
-      try {
-        await signInWithGoogleToken(access_token);
-      } catch (e) {
-        console.error(e);
+  // One Tap：頁面載入後自動顯示 Google 帳號選擇器
+  useGoogleOneTapLogin({
+    onSuccess: async (res) => {
+      if (res.credential) {
+        await signInWithGoogleToken(res.credential, true);
       }
     },
     onError: console.error,
+    disabled: !!user,
   });
 
   if (loading || familyLoading) {
@@ -67,26 +67,26 @@ export default function LoginPage() {
         ))}
       </div>
 
-      {/* Login button */}
-      <div className="w-full max-w-[384px] space-y-3">
-        <button
-          onClick={() => login()}
-          className="w-full flex items-center justify-center gap-3 bg-[#3a6758] text-white py-4 rounded-2xl font-semibold text-base shadow-md active:scale-95 transition-transform"
-        >
-          <svg width="20" height="20" viewBox="0 0 48 48" fill="none">
-            <path d="M44.5 20H24v8.5h11.8C34.7 33.9 29.1 37 24 37c-7.2 0-13-5.8-13-13s5.8-13 13-13c3.1 0 5.9 1.1 8.1 2.9l6-6C34.6 5.1 29.6 3 24 3 12.4 3 3 12.4 3 24s9.4 21 21 21c10.5 0 20-7.8 20-21 0-1.4-.2-2.7-.5-4z" fill="#FFC107"/>
-            <path d="M6.3 14.7l7 5.1C15 16.1 19.2 13 24 13c3.1 0 5.9 1.1 8.1 2.9l6-6C34.6 5.1 29.6 3 24 3c-7.7 0-14.4 4.4-17.7 11.7z" fill="#FF3D00"/>
-            <path d="M24 45c5.5 0 10.4-1.9 14.2-5.1l-6.6-5.4C29.6 36.1 26.9 37 24 37c-5.1 0-9.4-3.1-11.2-7.5L6 35c3.3 6.8 10.1 10 18 10z" fill="#4CAF50"/>
-            <path d="M44.5 20H24v8.5h11.8c-.8 2.5-2.4 4.6-4.5 6l6.6 5.4C41.8 36.5 45 31 45 24c0-1.4-.2-2.7-.5-4z" fill="#1976D2"/>
-          </svg>
-          使用 Google 登入
-        </button>
+      {/* Login — GoogleLogin 按鈕（自動用 FedCM / One Tap，不需要 popup 權限） */}
+      <div className="w-full max-w-[384px] space-y-3 flex flex-col items-center">
+        <GoogleLogin
+          onSuccess={async (res) => {
+            if (res.credential) {
+              await signInWithGoogleToken(res.credential, true);
+            }
+          }}
+          onError={console.error}
+          width="384"
+          text="signin_with"
+          shape="rectangular"
+          size="large"
+        />
         <p className="text-xs text-center text-[#404945] px-4">
           登入即表示同意我們的服務條款。您的資料存放在個人 Google Drive，我們不會儲存任何私人檔案。
         </p>
       </div>
 
-      <p className="mt-8 text-xs text-[#404945]/50">v0.1.4</p>
+      <p className="mt-8 text-xs text-[#404945]/50">v0.1.5</p>
 
     </div>
   );

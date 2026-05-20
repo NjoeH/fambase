@@ -17,7 +17,7 @@ interface AuthContextType {
   familyId: string | null;
   familyLoading: boolean;
   googleAccessToken: string | null;
-  signInWithGoogleToken: (accessToken: string) => Promise<void>;
+  signInWithGoogleToken: (token: string, isIdToken?: boolean) => Promise<void>;
   logout: () => Promise<void>;
   refreshFamilyId: () => Promise<void>;
 }
@@ -59,8 +59,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return () => { unsub(); clearTimeout(timeout); };
   }, []);
 
-  async function signInWithGoogleToken(accessToken: string) {
-    const credential = GoogleAuthProvider.credential(null, accessToken);
+  // idToken：來自 One Tap / GoogleLogin 的 credential.credential
+  // accessToken：來自 useGoogleLogin implicit flow 的 access_token
+  async function signInWithGoogleToken(token: string, isIdToken = false) {
+    const credential = isIdToken
+      ? GoogleAuthProvider.credential(token)
+      : GoogleAuthProvider.credential(null, token);
     const result = await signInWithCredential(auth, credential);
     const cred = GoogleAuthProvider.credentialFromResult(result);
     if (cred?.accessToken) {
