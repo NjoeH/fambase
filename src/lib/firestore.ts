@@ -12,6 +12,11 @@ export async function getUserFamilyId(uid: string): Promise<string | null> {
   return snap.exists() ? (snap.data().familyId ?? null) : null;
 }
 
+export async function getFamilyName(familyId: string): Promise<string | null> {
+  const snap = await getDoc(doc(db, "families", familyId));
+  return snap.exists() ? (snap.data().name ?? null) : null;
+}
+
 export async function createFamily(
   name: string,
   uid: string,

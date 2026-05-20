@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useLocale, useTranslations } from "next-intl";
 import { useAuth } from "@/lib/AuthContext";
+import { getFamilyName } from "@/lib/firestore";
 import TopBar from "@/components/TopBar";
 import ReminderItem from "@/components/home/ReminderItem";
 import ModuleCard from "@/components/home/ModuleCard";
@@ -15,12 +16,18 @@ export default function HomePage() {
   const router = useRouter();
   const locale = useLocale();
   const t = useTranslations();
+  const [familyName, setFamilyName] = useState("我的家庭");
 
   useEffect(() => {
     if (loading || familyLoading) return;
     if (!user) { router.replace(`/${locale}/login`); return; }
     if (!familyId) { router.replace(`/${locale}/onboarding`); return; }
   }, [user, loading, familyId, familyLoading, router, locale]);
+
+  useEffect(() => {
+    if (!familyId) return;
+    getFamilyName(familyId).then((name) => { if (name) setFamilyName(name); });
+  }, [familyId]);
 
   if (loading || familyLoading || !user || !familyId) {
     return (
@@ -37,17 +44,17 @@ export default function HomePage() {
   ];
 
   const modules = [
-    { icon: "receipt_long",       label: t("nav.bills"),     subtitle: "$12,450 待繳",  bgCard: "bg-secondary-fixed/50",       bgIcon: "bg-secondary-container",       iconColor: "text-secondary",          labelColor: "text-on-secondary-fixed-variant", href: "/bills" },
-    { icon: "directions_car",     label: t("nav.vehicles"),  subtitle: "2 台管理中",    bgCard: "bg-primary-fixed/50",         bgIcon: "bg-primary-container",         iconColor: "text-primary",            labelColor: "text-on-primary-fixed-variant",   href: "/vehicles" },
-    { icon: "enhanced_encryption",label: t("nav.documents"), subtitle: "15 份加密文件", bgCard: "bg-tertiary-fixed/50",        bgIcon: "bg-tertiary-container",        iconColor: "text-tertiary",           labelColor: "text-on-tertiary-fixed-variant",  href: "/documents" },
-    { icon: "home_work",          label: t("nav.property"),  subtitle: "3 項不動產",    bgCard: "bg-surface-container-high",   bgIcon: "bg-surface-container",         iconColor: "text-on-surface-variant", labelColor: "text-on-surface-variant",         href: "/property" },
-    { icon: "pets",               label: t("nav.pets"),      subtitle: "最新疫苗：2月", bgCard: "bg-[#FFE5D9]",               bgIcon: "bg-[#FFD7C4]",                 iconColor: "text-[#8B4513]",          labelColor: "text-[#8B4513]", subtitleColor: "text-[#8B4513]/70", href: "/pets" },
-    { icon: "verified_user",      label: t("nav.warranty"),  subtitle: "8 項有效保固",  bgCard: "bg-surface-container-low",    bgIcon: "bg-surface-container-high",    iconColor: "text-on-surface-variant", labelColor: "text-on-surface-variant",         href: "/warranty" },
+    { icon: "receipt_long",        label: t("nav.bills"),     subtitle: "帳單管理",   bgCard: "bg-secondary-fixed/50",     bgIcon: "bg-secondary-container",    iconColor: "text-secondary",          labelColor: "text-on-secondary-fixed-variant", href: "/bills",     disabled: true },
+    { icon: "directions_car",      label: t("nav.vehicles"),  subtitle: "車輛管理",   bgCard: "bg-primary-fixed/50",       bgIcon: "bg-primary-container",      iconColor: "text-primary",            labelColor: "text-on-primary-fixed-variant",   href: "/vehicles",  disabled: false },
+    { icon: "enhanced_encryption", label: t("nav.documents"), subtitle: "重要文件",   bgCard: "bg-tertiary-fixed/50",      bgIcon: "bg-tertiary-container",     iconColor: "text-tertiary",           labelColor: "text-on-tertiary-fixed-variant",  href: "/documents", disabled: true },
+    { icon: "home_work",           label: t("nav.property"),  subtitle: "不動產管理", bgCard: "bg-surface-container-high", bgIcon: "bg-surface-container",      iconColor: "text-on-surface-variant", labelColor: "text-on-surface-variant",          href: "/property",  disabled: false },
+    { icon: "pets",                label: t("nav.pets"),      subtitle: "寵物健康",   bgCard: "bg-[#FFE5D9]",             bgIcon: "bg-[#FFD7C4]",              iconColor: "text-[#8B4513]",          labelColor: "text-[#8B4513]", subtitleColor: "text-[#8B4513]/70", href: "/pets",      disabled: false },
+    { icon: "verified_user",       label: t("nav.warranty"),  subtitle: "保固管理",   bgCard: "bg-surface-container-low",  bgIcon: "bg-surface-container-high", iconColor: "text-on-surface-variant", labelColor: "text-on-surface-variant",          href: "/warranty",  disabled: false },
   ];
 
   return (
     <>
-      <TopBar familyName="林家大院" />
+      <TopBar familyName={familyName} userAvatar={user.photoURL ?? undefined} />
 
       <main className="mt-20 px-container-padding max-w-7xl mx-auto space-y-lg pb-24">
 
@@ -85,6 +92,7 @@ export default function HomePage() {
               labelColor="text-on-error-container"
               subtitleColor="text-on-surface-variant"
               colSpan
+              disabled
             />
           </div>
         </section>
@@ -96,19 +104,11 @@ export default function HomePage() {
           </h2>
           <div className="bg-surface rounded-xl p-md macaron-shadow space-y-md border border-surface-variant/30">
             <ActivityItem
-              avatar="https://lh3.googleusercontent.com/aida-public/AB6AXuAlwXFksM8ijhdNQrLCm_yFFm7nz81tW19hQyOJ24h9TdSmrNBDoicUXxZX5Vre_nuY35RSxWEZDNCbKq1UEGgGw7y8IN_4NjMckV3cC_k7c8w5EQcghqkPtzsUKqvT2-DOghzNhWMxwSNb_M4SNfz62i16rBX96zwtu-JVuDfpAOxmeK5ts2ZuveJLge13pKj9SXyDDHeAj0kWbWuHX0PyBRsz7B7U4YykVUpti0aEXWmlsSsBCXLq7cZuSPOs7RRYpllcMoTra1s"
-              avatarAlt="爸爸"
+              avatar={user.photoURL ?? ""}
+              avatarAlt={user.displayName ?? "我"}
               avatarBg="bg-primary-container"
-              text="爸爸上傳了新的車輛保險單"
-              time="2小時前"
-            />
-            <div className="h-px bg-surface-variant/50 mx-2" />
-            <ActivityItem
-              avatar="https://lh3.googleusercontent.com/aida-public/AB6AXuB9zx16BX4P-Q91jG_JOWETNfSz60DHSzdccmYuswsDcOrt0CFPtFuqYs4a6VGEQ9Q8X_9qh9MWdVR8sd-2bXKlQXPsYz-mu05OG0sUnh0OPwmJ6C6q_8qMp-GQ8EqPLvDkIWwFIN23F05mW9CpH5p00hukTk7LexZETlcKvSWb4PmytpjRyT-O-b9kxLJNCFyx_A2t_b9uXBVPqbgBRAPC_YEt0gfKeZMckowjV5Y7KzVOra7QFk2li5LB4VbH-TGM_efkoyHbccI"
-              avatarAlt="媽媽"
-              avatarBg="bg-tertiary-container"
-              text="媽媽已標記管理費為已支付"
-              time="昨天 18:45"
+              text={`${user.displayName ?? "你"} 建立了家庭群組`}
+              time="剛剛"
             />
           </div>
         </section>
@@ -120,7 +120,7 @@ export default function HomePage() {
         <Icon name="add" className="text-3xl" />
       </button>
 
-      <p className="fixed bottom-1 left-1/2 -translate-x-1/2 text-[10px] text-on-surface-variant/30 z-40">v0.1.3</p>
+      <p className="fixed bottom-1 left-1/2 -translate-x-1/2 text-[10px] text-on-surface-variant/30 z-40">v0.1.6</p>
     </>
   );
 }

@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useLocale } from "next-intl";
+import { useAuth } from "@/lib/AuthContext";
 import Icon from "@/components/Icon";
 
 type DriveStatus = "disconnected" | "connecting" | "connected";
@@ -10,13 +11,13 @@ type DriveStatus = "disconnected" | "connecting" | "connected";
 export default function SettingsPage() {
   const router = useRouter();
   const locale = useLocale();
+  const { user, logout } = useAuth();
   const [driveStatus, setDriveStatus] = useState<DriveStatus>("disconnected");
   const [driveFolder, setDriveFolder] = useState("");
   const [lang, setLang] = useState(locale);
 
   function handleConnectDrive() {
     setDriveStatus("connecting");
-    // 之後接 Google OAuth — 目前用 mock 模擬
     setTimeout(() => {
       setDriveStatus("connected");
       setDriveFolder("FamBase");
@@ -26,6 +27,11 @@ export default function SettingsPage() {
   function handleDisconnectDrive() {
     setDriveStatus("disconnected");
     setDriveFolder("");
+  }
+
+  async function handleLogout() {
+    await logout();
+    router.replace(`/${locale}/login`);
   }
 
   return (
@@ -188,15 +194,30 @@ export default function SettingsPage() {
           </h2>
           <div className="bg-white rounded-xl shadow-sm macaron-shadow overflow-hidden">
             <div className="flex items-center gap-md p-md border-b border-surface-variant/30">
-              <div className="w-10 h-10 rounded-full bg-primary-container flex items-center justify-center">
-                <Icon name="person" className="text-primary" />
-              </div>
+              {user?.photoURL ? (
+                <img
+                  src={user.photoURL}
+                  alt={user.displayName ?? ""}
+                  className="w-10 h-10 rounded-full object-cover border-2 border-primary-container"
+                />
+              ) : (
+                <div className="w-10 h-10 rounded-full bg-primary-container flex items-center justify-center">
+                  <Icon name="person" className="text-primary" />
+                </div>
+              )}
               <div className="flex-1">
-                <p className="text-sm font-semibold text-on-surface">使用者帳號</p>
-                <p className="text-xs text-on-surface-variant">尚未登入</p>
+                <p className="text-sm font-semibold text-on-surface">
+                  {user?.displayName ?? "使用者"}
+                </p>
+                <p className="text-xs text-on-surface-variant">
+                  {user?.email ?? ""}
+                </p>
               </div>
             </div>
-            <button className="w-full flex items-center gap-md p-md hover:bg-surface-container-low transition-colors text-error">
+            <button
+              onClick={handleLogout}
+              className="w-full flex items-center gap-md p-md hover:bg-surface-container-low transition-colors text-error"
+            >
               <Icon name="logout" className="text-error" />
               <span className="text-sm font-semibold">登出</span>
             </button>
