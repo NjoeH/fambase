@@ -194,3 +194,72 @@ export async function addWarranty(familyId: string, data: WarrantyData): Promise
 export async function deleteWarranty(familyId: string, warrantyId: string): Promise<void> {
   await deleteDoc(doc(db, "families", familyId, "warranties", warrantyId));
 }
+
+// ── Fuel Records ────────────────────────────────────────────────────────────
+
+export interface FuelRecordData {
+  date: string;
+  mileage: number;
+  amount: number;   // litres (gas) or kWh (electric)
+  cost: number;
+  notes: string;
+}
+
+export interface FuelRecord extends FuelRecordData {
+  id: string;
+}
+
+export async function getFuelRecords(familyId: string, vehicleId: string): Promise<FuelRecord[]> {
+  const snap = await getDocs(
+    query(
+      collection(db, "families", familyId, "vehicles", vehicleId, "fuelRecords"),
+      orderBy("createdAt", "desc")
+    )
+  );
+  return snap.docs.map((d) => ({ id: d.id, ...d.data() } as FuelRecord));
+}
+
+export async function addFuelRecord(
+  familyId: string, vehicleId: string, data: FuelRecordData,
+): Promise<string> {
+  const ref = await addDoc(
+    collection(db, "families", familyId, "vehicles", vehicleId, "fuelRecords"),
+    { ...data, createdAt: serverTimestamp() },
+  );
+  return ref.id;
+}
+
+// ── Service Records ─────────────────────────────────────────────────────────
+
+export interface ServiceRecordData {
+  date: string;
+  mileage: number;
+  type: string;
+  cost: number;
+  shop: string;
+  notes: string;
+}
+
+export interface ServiceRecord extends ServiceRecordData {
+  id: string;
+}
+
+export async function getServiceRecords(familyId: string, vehicleId: string): Promise<ServiceRecord[]> {
+  const snap = await getDocs(
+    query(
+      collection(db, "families", familyId, "vehicles", vehicleId, "serviceRecords"),
+      orderBy("createdAt", "desc")
+    )
+  );
+  return snap.docs.map((d) => ({ id: d.id, ...d.data() } as ServiceRecord));
+}
+
+export async function addServiceRecord(
+  familyId: string, vehicleId: string, data: ServiceRecordData,
+): Promise<string> {
+  const ref = await addDoc(
+    collection(db, "families", familyId, "vehicles", vehicleId, "serviceRecords"),
+    { ...data, createdAt: serverTimestamp() },
+  );
+  return ref.id;
+}

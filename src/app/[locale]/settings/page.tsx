@@ -1,16 +1,69 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useLocale } from "next-intl";
 import { useAuth } from "@/lib/AuthContext";
+import {
+  getVehicles, addVehicle, deleteVehicle,
+  Vehicle, VehicleData,
+} from "@/lib/firestore";
 import Icon from "@/components/Icon";
+import Modal from "@/components/Modal";
+
+const inputCls = "w-full rounded-xl border border-outline-variant bg-surface-container-low px-md py-sm text-sm focus:outline-none focus:ring-2 focus:ring-primary/30";
+
+const emptyVehicleForm: VehicleData = {
+  name: "", plate: "", type: "gas", fuelPct: 100, mileage: 0, insuranceExpiry: "",
+};
+
+function InputField({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div>
+      <label className="block text-xs font-semibold text-on-surface-variant mb-xs">{label}</label>
+      {children}
+    </div>
+  );
+}
 
 export default function SettingsPage() {
   const router = useRouter();
   const locale = useLocale();
-  const { user, logout } = useAuth();
+  const { user, logout, familyId } = useAuth();
   const [lang, setLang] = useState(locale);
+
+  // Vehicles management
+  const [vehicles, setVehicles] = useState<Vehicle[]>([]);
+  const [vehicleLoading, setVehicleLoading] = useState(true);
+  const [showAddVehicle, setShowAddVehicle] = useState(false);
+  const [vehicleForm, setVehicleForm] = useState<VehicleData>(emptyVehicleForm);
+  const [vehicleSaving, setVehicleSaving] = useState(false);
+
+  useEffect(() => {
+    if (!familyId) return;
+    getVehicles(familyId)
+      .then(setVehicles)
+      .finally(() => setVehicleLoading(false));
+  }, [familyId]);
+
+  async function handleAddVehicle() {
+    if (!familyId || !vehicleForm.name || !vehicleForm.plate) return;
+    setVehicleSaving(true);
+    try {
+      const id = await addVehicle(familyId, vehicleForm);
+      setVehicles((prev) => [...prev, { id, ...vehicleForm }]);
+      setShowAddVehicle(false);
+      setVehicleForm(emptyVehicleForm);
+    } finally {
+      setVehicleSaving(false);
+    }
+  }
+
+  async function handleDeleteVehicle(vehicleId: string) {
+    if (!familyId) return;
+    await deleteVehicle(familyId, vehicleId);
+    setVehicles((prev) => prev.filter((v) => v.id !== vehicleId));
+  }
 
   async function handleLogout() {
     await logout();
@@ -19,18 +72,59 @@ export default function SettingsPage() {
 
   return (
     <>
-      {/* TopBar */}
       <header className="flex items-center gap-md px-lg py-sm sticky top-0 z-50 bg-surface shadow-sm">
-        <button
-          onClick={() => router.push(`/${locale}`)}
-          className="p-xs -ml-xs rounded-full hover:bg-surface-container-high transition-colors active:scale-95 duration-200"
-        >
+        <button onClick={() => router.push(`/${locale}`)} className="p-xs -ml-xs rounded-full hover:bg-surface-container-high transition-colors active:scale-95 duration-200">
           <Icon name="chevron_left" className="text-primary" />
         </button>
         <h1 className="text-2xl font-bold text-primary">設定</h1>
       </header>
 
       <main className="px-container-padding pt-md max-w-2xl mx-auto pb-24 space-y-lg">
+
+        {/* 車輛管理 */}
+        <section>
+          <h2 className="text-xs font-semibold tracking-wider uppercase text-on-surface-variant mb-md px-1">
+            車輛管理
+          </h2>
+          <div className="bg-white rounded-xl shadow-sm macaron-shadow overflow-hidden">
+            {vehicleLoading ? (
+              <div className="flex justify-center py-md">
+                <div className="w-5 h-5 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+              </div>
+            ) : vehicles.length === 0 ? (
+              <div className="p-md text-center text-sm text-on-surface-variant">尚未新增車輛</div>
+            ) : (
+              vehicles.map((v, i, arr) => (
+                <div key={v.id} className={`flex items-center gap-md p-md ${i < arr.length - 1 ? "border-b border-surface-variant/30" : ""}`}>
+                  <div className="w-10 h-10 rounded-xl bg-primary-container/50 flex items-center justify-center shrink-0">
+                    <Icon name={v.type === "electric" ? "electric_car" : "directions_car"} className="text-primary" />
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-sm font-semibold text-on-surface">{v.name}</p>
+                    <p className="text-xs text-on-surface-variant">{v.plate} · {v.type === "electric" ? "電動車" : "油車"}</p>
+                  </div>
+                  <button
+                    onClick={() => handleDeleteVehicle(v.id)}
+                    className="p-xs rounded-full hover:bg-error-container transition-colors"
+                  >
+                    <Icon name="delete" className="text-error text-base" />
+                  </button>
+                </div>
+              ))
+            )}
+
+            {/* 新增按鈕 */}
+            <button
+              onClick={() => setShowAddVehicle(true)}
+              className="w-full flex items-center gap-md p-md hover:bg-surface-container-low transition-colors border-t border-surface-variant/30 text-primary"
+            >
+              <div className="w-10 h-10 rounded-xl bg-primary-container/30 flex items-center justify-center">
+                <Icon name="add" className="text-primary" />
+              </div>
+              <span className="text-sm font-semibold">新增車輛</span>
+            </button>
+          </div>
+        </section>
 
         {/* 語言設定 */}
         <section>
@@ -44,21 +138,14 @@ export default function SettingsPage() {
             ].map((l, i, arr) => (
               <button
                 key={l.code}
-                onClick={() => {
-                  setLang(l.code);
-                  router.push(`/${l.code}/settings`);
-                }}
-                className={`w-full flex items-center gap-md p-md hover:bg-surface-container-low transition-colors ${
-                  i < arr.length - 1 ? "border-b border-surface-variant/30" : ""
-                }`}
+                onClick={() => { setLang(l.code); router.push(`/${l.code}/settings`); }}
+                className={`w-full flex items-center gap-md p-md hover:bg-surface-container-low transition-colors ${i < arr.length - 1 ? "border-b border-surface-variant/30" : ""}`}
               >
                 <div className="flex-1 text-left">
                   <p className="text-sm font-semibold text-on-surface">{l.label}</p>
                   <p className="text-xs text-on-surface-variant">{l.sublabel}</p>
                 </div>
-                {lang === l.code && (
-                  <Icon name="check_circle" className="text-primary" />
-                )}
+                {lang === l.code && <Icon name="check_circle" className="text-primary" />}
               </button>
             ))}
           </div>
@@ -74,10 +161,7 @@ export default function SettingsPage() {
               { icon: "mail", label: "Email 通知", sub: "尚未設定" },
               { icon: "telegram", label: "Telegram 通知", sub: "尚未連結" },
             ].map((item, i, arr) => (
-              <div
-                key={item.label}
-                className={`flex items-center gap-md p-md ${i < arr.length - 1 ? "border-b border-surface-variant/30" : ""}`}
-              >
+              <div key={item.label} className={`flex items-center gap-md p-md ${i < arr.length - 1 ? "border-b border-surface-variant/30" : ""}`}>
                 <div className="w-10 h-10 rounded-xl bg-surface-container flex items-center justify-center">
                   <Icon name={item.icon} className="text-on-surface-variant" />
                 </div>
@@ -99,29 +183,18 @@ export default function SettingsPage() {
           <div className="bg-white rounded-xl shadow-sm macaron-shadow overflow-hidden">
             <div className="flex items-center gap-md p-md border-b border-surface-variant/30">
               {user?.photoURL ? (
-                <img
-                  src={user.photoURL}
-                  alt={user.displayName ?? ""}
-                  className="w-10 h-10 rounded-full object-cover border-2 border-primary-container"
-                />
+                <img src={user.photoURL} alt={user.displayName ?? ""} className="w-10 h-10 rounded-full object-cover border-2 border-primary-container" />
               ) : (
                 <div className="w-10 h-10 rounded-full bg-primary-container flex items-center justify-center">
                   <Icon name="person" className="text-primary" />
                 </div>
               )}
               <div className="flex-1">
-                <p className="text-sm font-semibold text-on-surface">
-                  {user?.displayName ?? "使用者"}
-                </p>
-                <p className="text-xs text-on-surface-variant">
-                  {user?.email ?? ""}
-                </p>
+                <p className="text-sm font-semibold text-on-surface">{user?.displayName ?? "使用者"}</p>
+                <p className="text-xs text-on-surface-variant">{user?.email ?? ""}</p>
               </div>
             </div>
-            <button
-              onClick={handleLogout}
-              className="w-full flex items-center gap-md p-md hover:bg-surface-container-low transition-colors text-error"
-            >
+            <button onClick={handleLogout} className="w-full flex items-center gap-md p-md hover:bg-surface-container-low transition-colors text-error">
               <Icon name="logout" className="text-error" />
               <span className="text-sm font-semibold">登出</span>
             </button>
@@ -129,6 +202,43 @@ export default function SettingsPage() {
         </section>
 
       </main>
+
+      {/* Add Vehicle Modal */}
+      <Modal open={showAddVehicle} onClose={() => setShowAddVehicle(false)} title="新增車輛">
+        <div className="space-y-md">
+          <InputField label="車輛名稱 *">
+            <input value={vehicleForm.name} onChange={(e) => setVehicleForm((f) => ({ ...f, name: e.target.value }))} placeholder="例：Tesla Model Y" className={inputCls} />
+          </InputField>
+          <InputField label="車牌號碼 *">
+            <input value={vehicleForm.plate} onChange={(e) => setVehicleForm((f) => ({ ...f, plate: e.target.value.toUpperCase() }))} placeholder="例：ABC-1234" className={inputCls} />
+          </InputField>
+          <InputField label="種類">
+            <div className="flex gap-sm">
+              {(["gas", "electric"] as const).map((tp) => (
+                <button key={tp} onClick={() => setVehicleForm((f) => ({ ...f, type: tp }))}
+                  className={`flex-1 py-sm rounded-xl text-sm font-semibold transition-colors ${vehicleForm.type === tp ? "bg-primary text-on-primary" : "bg-surface-container-high text-on-surface-variant"}`}>
+                  {tp === "gas" ? "油車" : "電動車"}
+                </button>
+              ))}
+            </div>
+          </InputField>
+          <div className="grid grid-cols-2 gap-md">
+            <InputField label="里程 (km)">
+              <input type="number" value={vehicleForm.mileage || ""} onChange={(e) => setVehicleForm((f) => ({ ...f, mileage: Number(e.target.value) }))} placeholder="0" className={inputCls} />
+            </InputField>
+            <InputField label={vehicleForm.type === "electric" ? "電量 (%)" : "油量 (%)"}>
+              <input type="number" min={0} max={100} value={vehicleForm.fuelPct || ""} onChange={(e) => setVehicleForm((f) => ({ ...f, fuelPct: Math.min(100, Number(e.target.value)) }))} placeholder="100" className={inputCls} />
+            </InputField>
+          </div>
+          <InputField label="保險到期日">
+            <input type="date" value={vehicleForm.insuranceExpiry} onChange={(e) => setVehicleForm((f) => ({ ...f, insuranceExpiry: e.target.value }))} className={inputCls} />
+          </InputField>
+          <button onClick={handleAddVehicle} disabled={!vehicleForm.name || !vehicleForm.plate || vehicleSaving}
+            className="w-full py-md bg-primary text-on-primary rounded-2xl font-semibold text-base disabled:opacity-50 hover:opacity-90 active:scale-95 transition-all">
+            {vehicleSaving ? "儲存中..." : "新增車輛"}
+          </button>
+        </div>
+      </Modal>
     </>
   );
 }
