@@ -3,11 +3,12 @@
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useLocale } from "next-intl";
+import { useGoogleLogin } from "@react-oauth/google";
 import { useAuth } from "@/lib/AuthContext";
 import Icon from "@/components/Icon";
 
 export default function LoginPage() {
-  const { user, loading, familyId, familyLoading, signInWithGoogle } = useAuth();
+  const { user, loading, familyId, familyLoading, signInWithGoogleToken } = useAuth();
   const router = useRouter();
   const locale = useLocale();
 
@@ -21,13 +22,16 @@ export default function LoginPage() {
     }
   }, [user, loading, familyId, familyLoading, router, locale]);
 
-  async function handleLogin() {
-    try {
-      await signInWithGoogle();
-    } catch (e) {
-      console.error(e);
-    }
-  }
+  const login = useGoogleLogin({
+    onSuccess: async ({ access_token }) => {
+      try {
+        await signInWithGoogleToken(access_token);
+      } catch (e) {
+        console.error(e);
+      }
+    },
+    onError: console.error,
+  });
 
   if (loading || familyLoading) {
     return (
@@ -66,7 +70,7 @@ export default function LoginPage() {
       {/* Login button */}
       <div className="w-full max-w-[384px] space-y-3">
         <button
-          onClick={handleLogin}
+          onClick={() => login()}
           className="w-full flex items-center justify-center gap-3 bg-[#3a6758] text-white py-4 rounded-2xl font-semibold text-base shadow-md active:scale-95 transition-transform"
         >
           <svg width="20" height="20" viewBox="0 0 48 48" fill="none">
@@ -82,7 +86,7 @@ export default function LoginPage() {
         </p>
       </div>
 
-      <p className="mt-8 text-xs text-[#404945]/50">v0.1.3</p>
+      <p className="mt-8 text-xs text-[#404945]/50">v0.1.4</p>
 
     </div>
   );

@@ -3,13 +3,12 @@
 import { createContext, useContext, useEffect, useState } from "react";
 import {
   onAuthStateChanged,
-  getRedirectResult,
-  signInWithRedirect,
+  signInWithCredential,
   GoogleAuthProvider,
   signOut,
   User,
 } from "firebase/auth";
-import { auth, googleProvider } from "./firebase";
+import { auth } from "./firebase";
 import { getUserFamilyId } from "./firestore";
 
 interface AuthContextType {
@@ -18,7 +17,7 @@ interface AuthContextType {
   familyId: string | null;
   familyLoading: boolean;
   googleAccessToken: string | null;
-  signInWithGoogle: () => Promise<void>;
+  signInWithGoogleToken: (accessToken: string) => Promise<void>;
   logout: () => Promise<void>;
   refreshFamilyId: () => Promise<void>;
 }
@@ -38,54 +37,36 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setFamilyLoading(false);
     }, 8000);
 
-    async function init() {
-      // 先等 redirect 結果處理完，再訂閱 auth 狀態
-      // 這樣 onAuthStateChanged 第一次觸發時 user 已經是正確值
-      try {
-        const result = await getRedirectResult(auth);
-        if (result) {
-          const credential = GoogleAuthProvider.credentialFromResult(result);
-          if (credential?.accessToken) {
-            setGoogleAccessToken(credential.accessToken);
-            sessionStorage.setItem("google_access_token", credential.accessToken);
-          }
-        }
-      } catch (err: unknown) {
-        const e = err as { code?: string; message?: string };
-        console.error("[Auth] getRedirectResult error:", e?.code, e?.message);
-      }
+    const unsub = onAuthStateChanged(auth, async (u) => {
+      clearTimeout(timeout);
+      setUser(u);
+      setLoading(false);
 
-      const unsub = onAuthStateChanged(auth, async (u) => {
-        clearTimeout(timeout);
-        console.log("[Auth] onAuthStateChanged:", u?.email ?? null);
-        setUser(u);
-        setLoading(false);
-
-        if (u) {
-          setFamilyLoading(true);
-          try {
-            const id = await getUserFamilyId(u.uid);
-            setFamilyId(id);
-          } finally {
-            setFamilyLoading(false);
-          }
-        } else {
-          setFamilyId(null);
+      if (u) {
+        setFamilyLoading(true);
+        try {
+          const id = await getUserFamilyId(u.uid);
+          setFamilyId(id);
+        } finally {
           setFamilyLoading(false);
         }
-      });
+      } else {
+        setFamilyId(null);
+        setFamilyLoading(false);
+      }
+    });
 
-      return unsub;
-    }
-
-    let unsub: (() => void) | undefined;
-    init().then((fn) => { unsub = fn; });
-
-    return () => { unsub?.(); clearTimeout(timeout); };
+    return () => { unsub(); clearTimeout(timeout); };
   }, []);
 
-  async function signInWithGoogle() {
-    await signInWithRedirect(auth, googleProvider);
+  async function signInWithGoogleToken(accessToken: string) {
+    const credential = GoogleAuthProvider.credential(null, accessToken);
+    const result = await signInWithCredential(auth, credential);
+    const cred = GoogleAuthProvider.credentialFromResult(result);
+    if (cred?.accessToken) {
+      setGoogleAccessToken(cred.accessToken);
+      sessionStorage.setItem("google_access_token", cred.accessToken);
+    }
   }
 
   async function logout() {
@@ -102,7 +83,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <AuthContext.Provider value={{ user, loading, familyId, familyLoading, googleAccessToken, signInWithGoogle, logout, refreshFamilyId }}>
+    <AuthContext.Provider value={{ user, loading, familyId, familyLoading, googleAccessToken, signInWithGoogleToken, logout, refreshFamilyId }}>
       {children}
     </AuthContext.Provider>
   );

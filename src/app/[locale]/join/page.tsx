@@ -3,12 +3,13 @@
 import { useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useLocale } from "next-intl";
+import { useGoogleLogin } from "@react-oauth/google";
 import { useAuth } from "@/lib/AuthContext";
 import { joinFamilyByCode } from "@/lib/firestore";
 import Icon from "@/components/Icon";
 
 export default function JoinPage() {
-  const { user, loading, signInWithGoogle, refreshFamilyId } = useAuth();
+  const { user, loading, signInWithGoogleToken, refreshFamilyId } = useAuth();
   const router = useRouter();
   const locale = useLocale();
   const searchParams = useSearchParams();
@@ -17,9 +18,16 @@ export default function JoinPage() {
   const [status, setStatus] = useState<"idle" | "joining" | "done" | "error">("idle");
   const [errorMsg, setErrorMsg] = useState("");
 
+  const googleLogin = useGoogleLogin({
+    onSuccess: async ({ access_token }) => {
+      await signInWithGoogleToken(access_token);
+    },
+    onError: console.error,
+  });
+
   async function handleJoin() {
     if (!user) {
-      await signInWithGoogle();
+      googleLogin();
       return;
     }
     setStatus("joining");

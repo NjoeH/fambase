@@ -3,6 +3,7 @@ import { getMessages } from "next-intl/server";
 import { notFound } from "next/navigation";
 import { routing } from "@/i18n/routing";
 import { AuthProvider } from "@/lib/AuthContext";
+import { GoogleOAuthProvider } from "@react-oauth/google";
 
 export default async function LocaleLayout({
   children,
@@ -18,9 +19,11 @@ export default async function LocaleLayout({
 
   return (
     <NextIntlClientProvider messages={messages}>
-      <AuthProvider>
-        {children}
-      </AuthProvider>
+      <GoogleOAuthProvider clientId={process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID!}>
+        <AuthProvider>
+          {children}
+        </AuthProvider>
+      </GoogleOAuthProvider>
     </NextIntlClientProvider>
   );
 }
