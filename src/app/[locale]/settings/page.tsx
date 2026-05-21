@@ -9,6 +9,8 @@ import {
   Vehicle, VehicleData,
   getServiceIntervals, addServiceInterval, deleteServiceInterval,
   ServiceInterval, ServiceIntervalData,
+  getBillCategories, addBillCategory, deleteBillCategory,
+  BillCategory, BillCategoryData,
 } from "@/lib/firestore";
 import Icon from "@/components/Icon";
 import Modal from "@/components/Modal";
@@ -22,6 +24,25 @@ const emptyVehicleForm: VehicleData = {
 const defaultIntervalTypes = ["定期保養", "輪胎更換", "煞車檢修", "引擎保養", "冷氣維修", "電池檢測"];
 
 const emptyIntervalForm: ServiceIntervalData = { type: "", intervalDays: undefined, intervalMileage: undefined };
+
+const defaultBillCategories = [
+  { name: "電費",   icon: "bolt",                 cycleDays: 60  },
+  { name: "水費",   icon: "water_drop",            cycleDays: 60  },
+  { name: "瓦斯",   icon: "local_fire_department", cycleDays: 30  },
+  { name: "管理費", icon: "apartment",             cycleDays: 30  },
+  { name: "房屋保險", icon: "home_heart",          cycleDays: 365 },
+  { name: "網路費", icon: "wifi",                  cycleDays: 30  },
+];
+
+const cycleOptions = [
+  { label: "每月",   days: 30  },
+  { label: "每兩個月", days: 60  },
+  { label: "每季",   days: 90  },
+  { label: "每半年", days: 180 },
+  { label: "每年",   days: 365 },
+];
+
+const emptyBillCategoryForm: BillCategoryData = { name: "", icon: "receipt_long", cycleDays: 30 };
 
 function InputField({ label, children }: { label: string; children: React.ReactNode }) {
   return (
@@ -51,12 +72,19 @@ export default function SettingsPage() {
   const [intervalForm, setIntervalForm] = useState<ServiceIntervalData>(emptyIntervalForm);
   const [intervalSaving, setIntervalSaving] = useState(false);
 
+  // Bill categories
+  const [billCategories, setBillCategories] = useState<BillCategory[]>([]);
+  const [showAddBillCat, setShowAddBillCat] = useState(false);
+  const [billCatForm, setBillCatForm] = useState<BillCategoryData>(emptyBillCategoryForm);
+  const [billCatSaving, setBillCatSaving] = useState(false);
+
   useEffect(() => {
     if (!familyId) return;
     getVehicles(familyId)
       .then(setVehicles)
       .finally(() => setVehicleLoading(false));
     getServiceIntervals(familyId).then(setIntervals);
+    getBillCategories(familyId).then(setBillCategories);
   }, [familyId]);
 
   async function handleAddVehicle() {
@@ -95,6 +123,25 @@ export default function SettingsPage() {
     if (!familyId) return;
     await deleteServiceInterval(familyId, intervalId);
     setIntervals((prev) => prev.filter((i) => i.id !== intervalId));
+  }
+
+  async function handleAddBillCategory() {
+    if (!familyId || !billCatForm.name) return;
+    setBillCatSaving(true);
+    try {
+      const id = await addBillCategory(familyId, billCatForm);
+      setBillCategories((prev) => [...prev, { id, ...billCatForm }]);
+      setShowAddBillCat(false);
+      setBillCatForm(emptyBillCategoryForm);
+    } finally {
+      setBillCatSaving(false);
+    }
+  }
+
+  async function handleDeleteBillCategory(categoryId: string) {
+    if (!familyId) return;
+    await deleteBillCategory(familyId, categoryId);
+    setBillCategories((prev) => prev.filter((c) => c.id !== categoryId));
   }
 
   async function handleLogout() {
@@ -219,6 +266,76 @@ export default function SettingsPage() {
                   <Icon name="add" className="text-primary" />
                 </div>
                 <span className="text-sm font-semibold">新增保養間隔</span>
+              </button>
+            )}
+          </div>
+        </section>
+
+        {/* 帳單類別設定 */}
+        <section>
+          <h2 className="text-xs font-semibold tracking-wider uppercase text-on-surface-variant mb-md px-1">
+            帳單類別設定
+          </h2>
+          <div className="bg-white rounded-xl shadow-sm macaron-shadow overflow-hidden">
+            {billCategories.length === 0 && !showAddBillCat && (
+              <div className="p-md text-center text-sm text-on-surface-variant">尚未設定帳單類別</div>
+            )}
+            {billCategories.map((cat, i, arr) => (
+              <div key={cat.id} className={`flex items-center gap-md p-md ${i < arr.length - 1 || showAddBillCat ? "border-b border-surface-variant/30" : ""}`}>
+                <div className="w-10 h-10 rounded-xl bg-tertiary-container/50 flex items-center justify-center shrink-0">
+                  <Icon name={cat.icon} className="text-tertiary" />
+                </div>
+                <div className="flex-1">
+                  <p className="text-sm font-semibold text-on-surface">{cat.name}</p>
+                  <p className="text-xs text-on-surface-variant">
+                    {cycleOptions.find((c) => c.days === cat.cycleDays)?.label ?? `每 ${cat.cycleDays} 天`}
+                  </p>
+                </div>
+                <button onClick={() => handleDeleteBillCategory(cat.id)} className="p-xs rounded-full hover:bg-error-container transition-colors">
+                  <Icon name="delete" className="text-error text-base" />
+                </button>
+              </div>
+            ))}
+
+            {showAddBillCat ? (
+              <div className="p-md space-y-md border-t border-surface-variant/30">
+                <p className="text-xs font-semibold text-on-surface-variant uppercase tracking-wider">選擇常用類別</p>
+                <div className="flex flex-wrap gap-sm">
+                  {defaultBillCategories.filter((d) => !billCategories.find((c) => c.name === d.name)).map((d) => (
+                    <button key={d.name} onClick={() => setBillCatForm({ name: d.name, icon: d.icon, cycleDays: d.cycleDays })}
+                      className={`flex items-center gap-xs px-sm py-xs rounded-full text-xs font-semibold transition-colors ${billCatForm.name === d.name ? "bg-primary text-on-primary" : "bg-surface-container-high text-on-surface-variant"}`}>
+                      <Icon name={d.icon} className="text-sm" />{d.name}
+                    </button>
+                  ))}
+                </div>
+                <InputField label="類別名稱">
+                  <input value={billCatForm.name} onChange={(e) => setBillCatForm((f) => ({ ...f, name: e.target.value }))} placeholder="或自訂類別..." className={inputCls} />
+                </InputField>
+                <InputField label="繳費週期">
+                  <div className="flex flex-wrap gap-sm">
+                    {cycleOptions.map((c) => (
+                      <button key={c.days} onClick={() => setBillCatForm((f) => ({ ...f, cycleDays: c.days }))}
+                        className={`px-sm py-xs rounded-full text-xs font-semibold transition-colors ${billCatForm.cycleDays === c.days ? "bg-primary text-on-primary" : "bg-surface-container-high text-on-surface-variant"}`}>
+                        {c.label}
+                      </button>
+                    ))}
+                  </div>
+                </InputField>
+                <div className="flex gap-sm">
+                  <button onClick={() => { setShowAddBillCat(false); setBillCatForm(emptyBillCategoryForm); }} className="flex-1 py-sm border border-outline-variant rounded-xl text-sm text-on-surface-variant">取消</button>
+                  <button onClick={handleAddBillCategory} disabled={!billCatForm.name || billCatSaving}
+                    className="flex-1 py-sm bg-primary text-on-primary rounded-xl text-sm font-semibold disabled:opacity-50">
+                    {billCatSaving ? "儲存中..." : "儲存"}
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <button onClick={() => setShowAddBillCat(true)}
+                className="w-full flex items-center gap-md p-md hover:bg-surface-container-low transition-colors border-t border-surface-variant/30 text-primary">
+                <div className="w-10 h-10 rounded-xl bg-primary-container/30 flex items-center justify-center">
+                  <Icon name="add" className="text-primary" />
+                </div>
+                <span className="text-sm font-semibold">新增帳單類別</span>
               </button>
             )}
           </div>

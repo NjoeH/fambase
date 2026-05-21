@@ -104,6 +104,7 @@ export interface MaintenanceRecordData {
   date: string;
   contractor: string;
   icon: string;
+  invoiceUrl?: string;
 }
 
 export interface MaintenanceRecord extends MaintenanceRecordData {
@@ -296,4 +297,67 @@ export async function addServiceInterval(familyId: string, data: ServiceInterval
 
 export async function deleteServiceInterval(familyId: string, intervalId: string): Promise<void> {
   await deleteDoc(doc(db, "families", familyId, "serviceIntervals", intervalId));
+}
+
+// ── Bill Categories (帳單類別設定) ────────────────────────────────────────────
+
+export interface BillCategoryData {
+  name: string;
+  icon: string;
+  cycleDays: number;
+}
+
+export interface BillCategory extends BillCategoryData {
+  id: string;
+}
+
+export async function getBillCategories(familyId: string): Promise<BillCategory[]> {
+  const snap = await getDocs(
+    query(collection(db, "families", familyId, "billCategories"), orderBy("createdAt", "asc"))
+  );
+  return snap.docs.map((d) => ({ id: d.id, ...d.data() } as BillCategory));
+}
+
+export async function addBillCategory(familyId: string, data: BillCategoryData): Promise<string> {
+  const ref = await addDoc(collection(db, "families", familyId, "billCategories"), {
+    ...data, createdAt: serverTimestamp(),
+  });
+  return ref.id;
+}
+
+export async function deleteBillCategory(familyId: string, categoryId: string): Promise<void> {
+  await deleteDoc(doc(db, "families", familyId, "billCategories", categoryId));
+}
+
+// ── Bill Records (帳單紀錄) ───────────────────────────────────────────────────
+
+export interface BillRecordData {
+  categoryId: string;
+  categoryName: string;
+  date: string;
+  amount: number;
+  notes: string;
+  invoiceUrl?: string;
+}
+
+export interface BillRecord extends BillRecordData {
+  id: string;
+}
+
+export async function getBillRecords(familyId: string): Promise<BillRecord[]> {
+  const snap = await getDocs(
+    query(collection(db, "families", familyId, "bills"), orderBy("createdAt", "desc"))
+  );
+  return snap.docs.map((d) => ({ id: d.id, ...d.data() } as BillRecord));
+}
+
+export async function addBillRecord(familyId: string, data: BillRecordData): Promise<string> {
+  const ref = await addDoc(collection(db, "families", familyId, "bills"), {
+    ...data, createdAt: serverTimestamp(),
+  });
+  return ref.id;
+}
+
+export async function deleteBillRecord(familyId: string, recordId: string): Promise<void> {
+  await deleteDoc(doc(db, "families", familyId, "bills", recordId));
 }
